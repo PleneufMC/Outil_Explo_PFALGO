@@ -1,0 +1,14 @@
+# ── Core (backtest engine + optimizer) ──
+pandas>=1.5.0
+numpy>=1.23.0
+scipy>=1.9.0
+optuna>=3.0
+
+# ── Web Dashboard (app.py) ──
+flask>=3.0
+openpyxl>=3.0
+plotly>=5.0
+
+# ── Testing ──
+pytest>=7.0
+pytest-cov>=4.0

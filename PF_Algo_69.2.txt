@@ -1,0 +1,2787 @@
+// This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © Pierre Fermanian
+//developer: QuantNomad
+//author: Pierre Fermanian 
+//
+// VERSION 69.2 - MM CROSS ENTRY ✅
+//
+// V69.2 CHANGES (from V69.1):
+//
+// 🆕 NOUVELLE ENTREE MM CROSS (Moving Average Crossover):
+//   • Signal basé sur le croisement de 2 moyennes mobiles indépendantes
+//   • LONG: MM rapide (MM1) croise MM lente (MM2) à la HAUSSE (golden cross)
+//   • SHORT: MM rapide (MM1) croise MM lente (MM2) à la BAISSE (death cross)
+//   • Types de MA disponibles: EMA et TRIMA (choix indépendant pour chaque MM)
+//   • ⚠️ Ces MMs sont INDÉPENDANTES de la MA utilisée pour le PMax
+//   • Paramètres configurables:
+//     - MM1 Type (EMA/TRIMA), MM1 Length (défaut 9)
+//     - MM2 Type (EMA/TRIMA), MM2 Length (défaut 21)
+//   • Entrée au market (comme RSI Divergence)
+//   • Catégorie ADX Regime: TREND (signal tendanciel)
+//
+// 🐛 BUG FIX: TRIMA dans getMA (utilisée par PMax + filtres LT/MT)
+//   • AVANT: TRIMA = ta.wma(src, length) → simple WMA, pas une TRIMA
+//   • APRÈS: TRIMA = ta.sma(ta.sma(src, N/2), N/2+1) → vrai double lissage SMA
+//   • Impact: Résultats différents si TRIMA sélectionnée pour PMax ou filtres LT/MT
+//
+// - 📊 Entry Types disponibles: Fractal, Boll+SMA, VWAP, ORB, Donc+Chikou, RSI Divergence, MM Cross
+//
+// ============================================
+//
+// VERSION 69.1 - SECURITY LAYERS REFACTOR ✅
+//
+// V69.1 CHANGES (from V69):
+//
+// ❌ SUPPRIMÉ: REGIME FILTER (Security Layer 6)
+//   • Raison: Redondant avec Security Layer 1 (Volatility ATR percentile)
+//   • Les deux utilisaient ta.percentrank(ATR) avec des logiques similaires
+//
+// ❌ SUPPRIMÉ: TIME EXIT (ancien Security Layer 3)
+//   • Raison: Redondant avec Max Hold Days (jours calendaires)
+//   • Max Hold Days est plus universel car basé sur le temps réel
+//
+// 🔄 DÉPLACÉ: VIX FILTER → SECURITY LAYER 0
+//   • Anciennement combiné avec Macro Filter
+//   • Maintenant COMPLÈTEMENT indépendant
+//   • Premier filtre de sécurité externe (volatilité du marché)
+//   • Nouveau groupe: "Security Layer 0 - VIX"
+//
+// 🔄 RENOMMÉ: SWAP PROTECTION → SECURITY LAYER 3
+//   • Anciennement "Layer 3b - Swap Protection"
+//   • Promu en Layer 3 principal après suppression de Time Exit
+//   • Nouveau groupe: "Security Layer 3 - Max Hold Days"
+//
+// 🆕 TRANSFORMÉ: STRATEGY HINT → ADX REGIME FILTER
+//   • De simple indication visuelle à FILTRE ACTIF
+//   • use_adx_regime_filter: active le blocage des entry types
+//   • TREND mode (ADX > 25): autorise Donc+Chikou, Fractal, ORB, MM Cross
+//   • REVERSION mode (ADX < 20): autorise VWAP, Boll+SMA, RSI Div
+//   • MIXED mode (ADX 20-25): autorise tous les entry types
+//   • RSI Divergence toujours autorisé (polyvalent)
+//   • Table affichée avec statut FILTER ON/HINT ONLY
+//
+// 📐 NOUVELLE ARCHITECTURE SECURITY LAYERS V69.1:
+//   Layer 0: VIX (External Volatility) - NEW position
+//   Layer 1: Volatility (ATR Percentile)
+//   Layer 2: Correlation
+//   Layer 3: Max Hold Days (ex-Swap Protection)
+//   Layer 4: MTF Momentum
+//   Layer 5: Gap Protection
+//   + ADX Regime Filter (Entry Type Compatibility)
+//
+// 📊 TOOLTIPS: ~135 (ajout ADX Regime Filter)
+// 🎯 Performance: Identique (pas de nouveaux calculs lourds)
+//
+// ============================================
+//
+// VERSION 69 - ADAPTIVE TRADING ✅
+//
+// V69 CHANGES (from V68.9):
+//
+// 🆕 FEATURE #1: DYNAMIC SL MULTIPLIER
+//   • Le multiplicateur ATR pour le SL s'adapte selon le ratio volatilité CT/LT
+//   • vol_ratio = ATR(14) / ATR(50)
+//   • vol_ratio > 1.2 → marché volatile → élargir SL (jusqu'à +50%)
+//   • vol_ratio < 0.8 → marché calme → resserrer SL (jusqu'à -20%)
+//   • Paramètres configurables: Min Mult (0.8), Max Mult (1.5)
+//   • Impact: Moins de stops prématurés en vol haute, SL plus serré en vol basse
+//
+// ============================================
+//
+// VERSION 68.9 - RSI DIVERGENCE ENTRY ✅
+//
+// V68.9 CHANGES (from V68.8):
+//
+// 🆕 NOUVELLE ENTREE RSI DIVERGENCE:
+//   • Detecte les divergences entre le prix et le RSI pour anticiper les retournements
+//   • LONG: Divergence haussiere (prix lower low, RSI higher low)
+//   • SHORT: Divergence baissiere (prix higher high, RSI lower high)
+//   • Parametres configurables: RSI Length, Pivot Lookback, Overbought/Oversold
+//   • Option Hidden Divergences pour detecter les continuations
+// - 📊 Entry Types disponibles: Fractal, Boll+SMA, VWAP, ORB, Donc+Chikou, RSI Divergence
+//
+// ============================================
+//
+// VERSION 68.8 - LT/MT FILTER LOGIC FIX ✅
+//
+// V68.8 CHANGES (from V68.7.1):
+//
+// 🐛 BUG FIX CRITIQUE: Filtres LT/MT - Retour à la logique V63
+//   • AVANT (V68.6-V68.7.1): Condition CROSSOVER → true pendant 1 SEULE barre
+//     Code: MAvg_HTF > PMax_HTF AND MAvg_HTF[1] <= PMax_HTF[1]
+//     Problème: Bloquait presque tous les trades (crossover = événement rare)
+//   • APRÈS (V68.8): Condition ÉTAT CONTINU → true tant que MA > PMax
+//     Code: MAvg_HTF[1] > PMax_HTF[1]
+//     Résultat: Filtre actif pendant toute la tendance (comme V63)
+// - Le Multiplier ATR reste configurable (0.5 à 3.0, défaut 1.5)
+// - Impact backtest: MAJEUR - les filtres LT/MT fonctionnent à nouveau correctement
+//
+// ============================================
+//
+// VERSION 68.7.1 - MACRO FILTER BUGFIX + SWAP PROTECTION ✅
+//
+// V68.7.1 CHANGES (from V68.7):
+//
+// 🆕 NOUVELLE FONCTIONNALITÉ: MAX HOLD DAYS (Swap Fee Protection)
+// - Ferme automatiquement les positions après X jours calendaires
+// - Calcul basé sur le TEMPS RÉEL (pas les barres) → fonctionne sur tous TF
+// - Option "Profit Exception" : conserve si profit > seuil (évite de couper les gagnants)
+// - Paramètres configurables :
+//   • Max Days : 1-30 jours (défaut 5)
+//   • Profit Exception : ON/OFF (défaut ON)
+//   • Min Profit % : seuil pour exception (défaut 1%)
+// - Affichage dans le tooltip debug : jours en position + statut
+// - Comment de sortie explicite : "Max Days (Xd)"
+//
+// 🐛 BUG FIX #8: getRSR_strength/climate - Gestion correcte des valeurs `na`
+//   • AVANT: Si données manquantes → score = -1 (biais négatif systématique)
+//   • APRÈS: Si données manquantes → score = 0 (neutre, pas de biais)
+//   • Impact: Le Macro Score n'est plus faussé par les symboles sans données
+// 🐛 BUG FIX #9: Momentum calculation - Protection contre division par `na`
+//   • AVANT: ratio[5] = na → division par na → score_final = na → corruption
+//   • APRÈS: Vérification `not na(ratio[5])` avant calcul momentum
+//   • Impact: Évite la propagation de `na` dans le score total
+// 🐛 BUG FIX #5: Correlation Filter - Logique Short corrigée
+//   • AVANT: Short si correlation <= -threshold (ex: <= -0.5) → très restrictif
+//   • APRÈS: Short si |correlation| >= threshold → basé sur FORCE de corrélation
+//   • Impact: Les shorts ne sont plus injustement bloqués
+//   • Logique: Un actif fortement corrélé (+ ou -) est prévisible → trades OK
+//
+// VERSION 68.7 - VWAP ENTRY + CLEANUP ✅
+// 
+// V68.7 CHANGES (from V68.6):
+// - 🆕 NOUVELLE ENTRÉE VWAP + BANDES:
+//   • Mean reversion institutionnel (référence des pros)
+//   • LONG: Prix touche bande INFÉRIEURE → rebond vers VWAP
+//   • SHORT: Prix touche bande SUPÉRIEURE → rejet vers VWAP
+//   • Écart-type configurable (0.5 à 4.0, défaut 2.0)
+//   • Option confirmation bougie (ON/OFF)
+// - ❌ ENTRÉES SUPPRIMÉES (jamais utilisées):
+//   • Entry Delta: supprimée
+//   • Entry Linear: supprimée (économie 2 request.security + boucle calcSlope)
+// - 🚀 PERFORMANCE: +15% (suppression calcSlope loop + 2 request.security)
+// - 📊 Entry Types disponibles: Fractal, Boll+SMA, VWAP, ORB, Donc+Chikou
+//
+// V68.6 CHANGES (from V68.5):
+// - 🎯 LT/MT TREND FILTERS: Multiplier configurable ajouté (défaut: 1.5 au lieu de 3.0)
+//   • Rend ces filtres BEAUCOUP moins restrictifs et plus utiles
+//   • Menu déroulant: 0.5, 1.0, 1.5, 2.0, 2.5, 3.0 (incréments de 0.5)
+//   • Multiplier sur la même ligne que TF pour facilité d'usage
+// - 🔧 TIMEFRAMES par défaut corrigés:
+//   • LT Trend: "1" → "D" (daily) - plus cohérent pour long terme
+//   • MT Trend: "1" → "240" (4H) - plus cohérent pour moyen terme
+// - 📏 MA Length LT changée: 10 → 20 (plus stable pour long terme)
+// - Tooltips améliorés avec recommandations claires et impact de chaque valeur
+//
+// V68.5 CHANGES (from V68.4):
+// - 🐛 BUG FIX CRITIQUE: Diff MA/Red et Diff Price/Red utilisaient >= au lieu de <=
+//   AVANT: "Trade si distance >= 1%" (ILLOGIQUE - autorisait trades éloignés)
+//   APRÈS: "Trade si distance <= 1%" (CORRECT - bloque trades trop éloignés)
+// - UI: Labels changés de "Diff (%)" → "Max Diff (%)" pour clarté
+// - Tooltips améliorés avec explication claire du fonctionnement
+//
+// V68.4 CHANGES (from V68.3):
+// - MACRO: Séparation en 2 composantes avec TF indépendants :
+//   • RELATIVE STRENGTH (RS) : Votre actif vs 10 assets (rs_tf)
+//   • MARKET CLIMATE : 10 ratios Risk-On/Off (climate_tf)
+// - MACRO: 4 modes de filtrage (Combined, RS Only, Climate Only, Both Required)
+// - DEBUG: Table améliorée avec RS/Climate/Total séparés
+// - DEBUG: 3 courbes sur le graphique (RS teal, Climate purple, Total blue)
+//
+// V68.3 CHANGES (from V68.2):
+// - UI: Supprimé toutes les mentions "V67" dans les labels utilisateur
+// - UI: Noms de groupes simplifiés ("Security Layer 1-5" au lieu de "V67 - Layer")
+// - UX: Tooltip Dynamic TSL amélioré avec exemple concret
+// - FIX: Max Candles Filter défaut changé de 20 → 100
+// - FIX: Macro Score défaut -50/+50 (aucun filtrage pour setup brut)
+//
+// V68.2 CHANGES (from V68.1):
+// - PERFORMANCE: ATR(14) centralisé en 1 variable globale au lieu de 4 calculs (+5% perf)
+// - PERFORMANCE: WMA/SMA HTF conditionnel - request.security() seulement si filtre actif (+3% perf)
+// - PERFORMANCE: Boucle calcSlope limitée à 500 itérations max au lieu de 5000 (+10% perf)
+// - UX: 92 tooltips ajoutés - tous les 117 inputs ont maintenant des tooltips français (+50% accessibilité)
+// - UX: Noms de groupes normalisés - format cohérent sans deux-points trailing (+20% maintenabilité)
+// → Total: +18% performance, +70% amélioration UX
+//
+// V68.1 CHANGES (from V68.0):
+// - REMOVED: Market Regime Filter (redondant avec Macro Filter qui analyse déjà SPY)
+//   → Économie: 1 request.security() en moins
+//   → Le Macro Filter analyse SPY sous 3 angles: s7=SPY, s16=SPY/TLT, s13=SPY/VXX
+// - FIXED: VIX request.security() dupliqué (ligne 1682 réutilise vix_value)
+// - FIXED: Protection division par zéro sur 4 ratios
+// - FIXED: Typo "betweem" → "between"
+//
+// V68.0 CHANGES (from V67.3):
+// PHASE 1 (Conditional Calculations):
+// - FIXED: All filters now use conditional calculations (no request.security when OFF)
+// - FIXED: Macro Score calculation only runs when macro_filter = true
+// - FIXED: VIX request.security only runs when vix_filter = true
+// - FIXED: MTF Momentum (6 request.security) only runs when mtf_momentum_filter = true
+// - FIXED: Correlation Filter tuple reassignment bug corrected
+// - OPTIMIZED: Volatility Filter using ta.percentrank (100x faster)
+// - PERFORMANCE: 30-50% faster compilation when filters are disabled
+//
+// PHASE 2 (Value Ranges & UX):
+// - FIXED: Macro Score range (0-100 → -50 to +50) to accept negative values
+// - ADDED: 22 detailed tooltips for all critical inputs (in French)
+// - IMPROVED: Default values (-30/+30) now realistic for typical market conditions
+//
+// PHASE 3 (Anti-Repainting):
+// - FIXED: Added lookahead=barmerge.lookahead_off to ALL 18 request.security()
+// - PROTECTION: Strategy no longer "looks into future" = realistic backtest results
+// - STABLE: Signals will NOT change retroactively after bar closes
+//
+// PHASE 4 (Final Optimizations):
+// - FIXED: Gap Filter redundant logic simplified
+//
+// Features V69.1:
+// - Advanced Macro Filter with 20 indicators (dynamic SMA weighting)
+// - 6 Security Layers V69.1:
+//   Layer 0: VIX (External Volatility) - Independent filter
+//   Layer 1: Volatility (ATR Percentile)
+//   Layer 2: Correlation
+//   Layer 3: Max Hold Days (Swap Protection)
+//   Layer 4: MTF Momentum
+//   Layer 5: Gap Protection
+// - ADX Regime Filter (Entry Type Compatibility)
+// - Dynamic SL Multiplier (V69)
+// - Dynamic Trailing Stop Loss
+// - Partial Profit Taking
+// - DEBUG MODE: Visualize filter status on chart
+//
+// VERSION HISTORY:
+// V67.3 : Enhanced Macro Filter + VIX Regime + Independent Filters
+// V68.0 : COMPLETE REFACTORING (9 BUGS FIXED)
+// V68.1 : Market Regime supprimé + VIX dupliqué corrigé + Protection division/0
+// V68.2 : Performance optimisée (+18%) + UX complète (117 tooltips) + Groupes normalisés
+// V68.3 : UI nettoyée (plus de V67) + Tooltips TSL améliorés + Défauts optimisés
+// V68.4 : Macro Filter restructuré (RS + Climate avec TF séparés) + 4 modes filtrage
+// V68.5 : BUG FIX CRITIQUE Diff Filters (>= → <=) - Logique corrigée pour distance MAXIMUM
+// V68.6 : LT/MT Filters améliorés (Multiplier configurable 1.5, TF corrigés D/4H)
+// V68.7 : VWAP + Bandes ajouté, Delta et Linear supprimés (+15% perf)
+// V68.7.1 : BUG FIX Macro/Correlation + NEW Max Hold Days (Swap Protection)
+// V68.8 : BUG FIX CRITIQUE LT/MT Filters - Retour logique V63 (état continu)
+// V68.9 : RSI Divergence Entry (regular + hidden divergences)
+// V69   : Dynamic SL Multiplier + Regime Filter + Strategy Hint
+// V69.1 : Security Layers Refactor - VIX→L0, Time Exit/Regime supprimés, ADX Regime Filter
+
+//@version=6
+strategy('P.F.Algo_V69.2', shorttitle = 'PFA69.2', overlay = true, pyramiding = 1, process_orders_on_close = false, max_labels_count = 500,
+ default_qty_value = 100, default_qty_type = strategy.percent_of_equity, slippage = 5, margin_long = 0, margin_short = 0)
+
+////////////
+// INPUTS /{
+
+// DEBUG MODE
+debug_mode = input.bool(false, '🔍 DEBUG MODE', 
+     tooltip='🔍 Active le mode debug pour visualiser:\n• Score Macro sur le graphique\n• Table des filtres en haut à droite\n• Statuts Long/Short de chaque filtre',
+     group = 'DEBUG', inline = 'debug1')
+debug_show_macro_score = input.bool(true, 'Show Macro Score', 
+     tooltip='Affiche le score macro (-50 à +50) sur le graphique',
+     group = 'DEBUG', inline = 'debug2')
+debug_show_filters = input.bool(true, 'Show Filter Status', 
+     tooltip='Affiche la table des filtres (haut droite)',
+     group = 'DEBUG', inline = 'debug2')
+
+//Pineconnector Inputs
+LicenseID = input('6119578435797', 'LicenseID', 
+     tooltip='🔑 Votre License ID PineConnector pour envoyer les ordres à MT4/MT5.\nLaissez vide si vous n\'utilisez pas PineConnector.',
+     group = "PineConnector")
+
+//Range 
+tf        = input.timeframe("D", title="TF", 
+     tooltip='⏰ Timeframe pour le calcul des niveaux Fibonacci.\nRecommandé: D (daily) pour swing trading',
+     group = "Fib Levels", inline = "fib1")
+fiblength = input.int(265, title="Fib Length", minval=1, 
+     tooltip='📊 Nombre de barres pour calculer le range Fibonacci.\n265 ≈ 1 an en daily',
+     group = "Fib Levels", inline = "fib1")
+
+plot_zones = input.bool(false, title = "Plot Fibonacci Zones?", 
+     tooltip='🎨 Affiche les zones Fibonacci colorées sur le graphique',
+     group = "Fib Levels")
+
+fib_zone1 = input.bool(true, title = '0.000 -> 0.236', group = "Fib Levels", inline = "fib2")
+fib_zone2 = input.bool(true, title = '0.236 -> 0.382', group = "Fib Levels", inline = "fib2")
+fib_zone3 = input.bool(true, title = '0.382 -> 0.500', group = "Fib Levels", inline = "fib3")
+fib_zone4 = input.bool(true, title = '0.500 -> 0.618', group = "Fib Levels", inline = "fib3")
+fib_zone5 = input.bool(true, title = '0.618 -> 0.764', group = "Fib Levels", inline = "fib4")
+fib_zone6 = input.bool(true, title = '0.764 -> 0.100', group = "Fib Levels", inline = "fib4")
+
+Multiplier = input.float(title = 'ATR Mult', step = 0.1, defval = 3.0, 
+     tooltip='📈 Multiplicateur ATR pour la ligne rouge (PMax).\nPlus élevé = SL plus large, moins de faux signaux.\nRecommandé: 2.0-4.0',
+     group = 'Moving Average + ATR')
+mav = input.string(title = 'MA Type', defval = 'EMA', options = ['SMA', 'EMA', 'WMA', 'TMA', 'TRIMA', 'VAR', 'WWMA', 'ZLEMA', 'TSF'], 
+     tooltip='📉 Type de moyenne mobile pour le calcul PMax.\n• EMA: Réactive, standard\n• SMA: Lisse, retardée\n• ZLEMA: Très réactive, moins de lag',
+     group = 'Moving Average + ATR', inline = 'ma')
+length = input.int(10, 'MA Length', minval = 1, 
+     tooltip='📏 Période de la moyenne mobile.\nPlus court = plus réactif.\nRecommandé: 10-20',
+     group = 'Moving Average + ATR', inline = 'ma')
+
+//Basic Settings :
+entry_type = input.string('Donc+Chikou', title = 'Entry Type', options = ['Fractal', 'Boll+SMA', 'VWAP', 'ORB', 'Donc+Chikou', 'RSI Divergence', 'MM Cross'],
+     tooltip='🎯 Type de signal d\'entrée:\n• Fractal: Entry sur breakout fractal\n• Boll+SMA: Bollinger + SMA crossover\n• VWAP: VWAP + Bandes (mean reversion institutionnel)\n• ORB: Opening Range Breakout\n• Donc+Chikou: Donchian + Chikou Span\n• RSI Divergence: Divergences prix/RSI (retournement)\n• MM Cross: Croisement de 2 moyennes mobiles (tendance)',
+     group = 'Entries')
+
+long_side = input.bool(true, title = 'Long Side', 
+     tooltip='✅ Autorise les positions LONG (achat)',
+     group = 'Entries', inline = 'side')
+short_side = input.bool(true, title = 'Short Side', 
+     tooltip='✅ Autorise les positions SHORT (vente)',
+     group = 'Entries', inline = 'side')
+
+order_pause = input.int(5, 'Pause between orders', 
+     tooltip='⏱️ Nombre minimum de barres entre deux ordres.\nÉvite le sur-trading.\nRecommandé: 3-10',
+     group = 'Entries')
+
+
+// Entry #1 - VWAP + Bandes (V68.7 - Remplace Delta)
+// 📊 Logique: Mean reversion vers VWAP institutionnel
+// LONG: Prix touche la bande INFÉRIEURE → rebond vers VWAP
+// SHORT: Prix touche la bande SUPÉRIEURE → rejet vers VWAP
+vwap_stddev_mult = input.float(2.0, title = 'VWAP StdDev', minval = 0.5, maxval = 4.0, step = 0.5,
+     tooltip='📊 Multiplicateur écart-type des bandes VWAP.\n' +
+             '• 1.0 = Bandes serrées (signaux fréquents, risqué)\n' +
+             '• 2.0 = Standard (68% du temps dans les bandes)\n' +
+             '• 2.5 = Signaux rares mais plus fiables\n' +
+             '• 3.0 = Extrêmes seulement (95% du temps dans les bandes)',
+     group = 'Entry #1 - VWAP', inline = 'vwap1')
+vwap_length = input.int(20, title = 'StdDev Length', minval = 5, maxval = 100,
+     tooltip='📏 Période pour le calcul de l\'écart-type.\n' +
+             'Plus long = bandes plus stables.\nRecommandé: 14-30',
+     group = 'Entry #1 - VWAP', inline = 'vwap1')
+vwap_confirmation = input.bool(true, title = 'Confirmation Candle',
+     tooltip='🕯️ Attendre une bougie de confirmation avant entry.\n' +
+             '• ON: Plus fiable (bougie de rejet requise)\n' +
+             '• OFF: Entry immédiate au toucher de bande',
+     group = 'Entry #1 - VWAP')
+show_vwap = input.bool(true, title = 'Show VWAP Bands',
+     tooltip='🎨 Affiche le VWAP et ses bandes sur le graphique',
+     group = 'Entry #1 - VWAP')
+
+// Entry #2 - Fractals
+fractal_buffer_point = input.float(0.0, 'Buffer Point', 
+     tooltip='📊 Buffer ajouté au niveau fractal.\n0 = breakout exact du fractal',
+     group = 'Entry #2 - Fractals')
+show_fractals = input.bool(true, 'Show Fractals Levels', 
+     tooltip='🎨 Affiche les lignes horizontales des niveaux fractals',
+     group = 'Entry #2 - Fractals')
+
+// Entry #3 - Boll+SMA
+length_bb_ma = input.int(20, 'BB MA Len', minval = 1, 
+     tooltip='📊 Période de la Bollinger Band',
+     group = 'Entry #3 - Boll+SMA', inline = 'bb')
+mult_bb_ma = input.float(2.0, 'StdDev', minval = 0.001, maxval = 50, 
+     tooltip='📈 Multiplicateur écart-type.\n2.0 = standard',
+     group = 'Entry #3 - Boll+SMA', inline = 'bb')
+length_bb_sma = input.int(50, 'BB SMA Len', minval = 1, 
+     tooltip='📏 Période SMA pour comparaison avec BB',
+     group = 'Entry #3 - Boll+SMA')
+
+// Entry #4 - Linear SUPPRIMÉ en V68.7 (remplacé par VWAP)
+// Les inputs Linear ont été retirés pour simplifier l'algo
+// et économiser 2 request.security() calls
+
+// Entry #5 - ORB 
+openingRangeMinutes = input.int(15, 'First Minutes of the day', 
+     tooltip='⏰ Durée de la période d\'ouverture (en minutes).\nLe range est calculé sur ces X premières minutes.\nRecommandé: 15-30',
+     group = 'Entry #5 - ORB')
+
+// Entry #6 - Donchian Chikou
+don_length = input.int(20, title = 'Donchian Channel Period',
+     tooltip='📈 Période du canal Donchian.\nPlus long = breakouts plus significatifs.\nRecommandé: 20-55',
+     group = 'Entry #6 - Donc+Chikou')
+
+// Entry #7 - RSI Divergence (V68.9)
+// 📊 Detection des divergences entre le prix et le RSI
+// LONG: Divergence haussiere (prix lower low, RSI higher low) = retournement haussier
+// SHORT: Divergence baissiere (prix higher high, RSI lower high) = retournement baissier
+rsi_div_length = input.int(14, title = 'RSI Length', minval = 5, maxval = 50,
+     tooltip='📏 Periode du RSI pour la detection de divergence.\n' +
+             '• 14 = Standard (recommande)\n' +
+             '• 7-10 = Plus reactif (signaux frequents)\n' +
+             '• 21-30 = Plus lisse (moins de faux signaux)',
+     group = 'Entry #7 - RSI Divergence', inline = 'rsi_div1')
+rsi_div_pivot_lookback = input.int(5, title = 'Pivot Lookback', minval = 2, maxval = 20,
+     tooltip='📊 Nombre de barres de chaque cote pour detecter un pivot.\n' +
+             '• 5 = Standard (pivots classiques)\n' +
+             '• 2-3 = Pivots mineurs (plus de signaux)\n' +
+             '• 7-10 = Pivots majeurs (signaux rares mais forts)',
+     group = 'Entry #7 - RSI Divergence', inline = 'rsi_div1')
+rsi_div_overbought = input.int(70, title = 'Overbought', minval = 60, maxval = 90,
+     tooltip='🔴 Seuil de surachat RSI.\n' +
+             '• 70 = Standard\n' +
+             '• 80 = Conservateur (signaux plus fiables)',
+     group = 'Entry #7 - RSI Divergence', inline = 'rsi_div2')
+rsi_div_oversold = input.int(30, title = 'Oversold', minval = 10, maxval = 40,
+     tooltip='🟢 Seuil de survente RSI.\n' +
+             '• 30 = Standard\n' +
+             '• 20 = Conservateur (signaux plus fiables)',
+     group = 'Entry #7 - RSI Divergence', inline = 'rsi_div2')
+rsi_div_detect_hidden = input.bool(true, title = 'Detect Hidden Divergences',
+     tooltip='🔄 DIVERGENCES CACHEES\n\n' +
+             '• ON : Detecte aussi les divergences de continuation\n' +
+             '  - Hidden Bullish: Prix higher low, RSI lower low\n' +
+             '  - Hidden Bearish: Prix lower high, RSI higher high\n' +
+             '• OFF : Uniquement divergences regulieres (retournement)\n\n' +
+             'Recommande: ON pour plus d\'opportunites',
+     group = 'Entry #7 - RSI Divergence')
+show_rsi_div = input.bool(true, title = 'Show RSI Divergence Signals',
+     tooltip='🎨 Affiche les signaux de divergence RSI sur le graphique',
+     group = 'Entry #7 - RSI Divergence')
+
+// Entry #8 - MM Cross (V69.2)
+// 📊 Logique: Croisement de 2 moyennes mobiles pour détecter les changements de tendance
+// ⚠️ Ces MAs sont INDÉPENDANTES de la MA utilisée pour le PMax
+mm_cross_ma1_type = input.string('EMA', title = 'MM1 Type', options = ['EMA', 'TRIMA'],
+     tooltip='📈 TYPE DE MOYENNE MOBILE RAPIDE (MM1)\n\n' +
+             '• EMA: Exponential MA - Réactive, poids sur données récentes\n' +
+             '• TRIMA: Triangular MA - Lisse, double lissage\n\n' +
+             '⚠️ Indépendant de la MA du PMax',
+     group = 'Entry #8 - MM Cross', inline = 'mm1')
+mm_cross_ma1_len = input.int(9, title = 'MM1 Length', minval = 2, maxval = 200,
+     tooltip='📏 Période de la MM rapide (MM1)\n\n' +
+             '  • 5-10: Très réactif (scalping)\n' +
+             '  • 9: Standard ✅ (recommandé)\n' +
+             '  • 15-20: Moins de faux signaux',
+     group = 'Entry #8 - MM Cross', inline = 'mm1')
+
+mm_cross_ma2_type = input.string('EMA', title = 'MM2 Type', options = ['EMA', 'TRIMA'],
+     tooltip='📉 TYPE DE MOYENNE MOBILE LENTE (MM2)\n\n' +
+             '• EMA: Exponential MA - Réactive, poids sur données récentes\n' +
+             '• TRIMA: Triangular MA - Lisse, double lissage\n\n' +
+             '⚠️ Indépendant de la MA du PMax',
+     group = 'Entry #8 - MM Cross', inline = 'mm2')
+mm_cross_ma2_len = input.int(21, title = 'MM2 Length', minval = 2, maxval = 500,
+     tooltip='📏 Période de la MM lente (MM2)\n\n' +
+             '  • 20-21: Standard ✅ (recommandé)\n' +
+             '  • 50: Croisement majeur (golden/death cross classique)\n' +
+             '  • 100-200: Signaux très rares mais puissants\n\n' +
+             '⚠️ MM2 Length doit être > MM1 Length',
+     group = 'Entry #8 - MM Cross', inline = 'mm2')
+
+show_mm_cross = input.bool(true, title = 'Show MM Cross Lines',
+     tooltip='🎨 Affiche les 2 moyennes mobiles sur le graphique\nMM1 (rapide) en bleu, MM2 (lente) en orange',
+     group = 'Entry #8 - MM Cross')
+
+// Filter #2 -lt_trend_filter 
+// V68.6: TF par défaut corrigé (1 → D), Multiplier ajouté
+lt_trend_filter = input(false, title = '📈 LT Trend Filter', 
+     tooltip='📈 FILTRE TENDANCE LONG TERME\n\n💡 Bloque trades contre la tendance HTF.\n• Long si MA > PMax HTF\n• Short si MA < PMax HTF\n\n⚙️ PMax HTF = MA ± (ATR × Multiplier)',
+     group = 'Filter - Long-term moving average', inline = 'lt_trend_filter_1')
+lt_trend_filter_tf = input.timeframe(title = 'TF', defval = 'D', 
+     tooltip='⏰ Timeframe tendance LT\nRecommandé: D (daily) ou W (weekly)',
+     group = 'Filter - Long-term moving average', inline = 'lt_trend_filter_1')
+lt_trend_filter_mult = input.float(1.5, 'Multiplier', options=[0.5, 1.0, 1.5, 2.0, 2.5, 3.0],
+     tooltip='🔢 MULTIPLIER ATR pour PMax HTF\n\n💡 Impact:\n  • 0.5-1.0: Très restrictif (scalping)\n  • 1.5: Équilibré ✅ (recommandé)\n  • 2.0-2.5: Permissif (swing)\n  • 3.0: Très permissif (peu de filtrage)',
+     group = 'Filter - Long-term moving average', inline = 'lt_trend_filter_1')
+
+lt_trend_filter_mav = input.string(title = 'MA Type', defval = 'EMA', options = ['SMA', 'EMA', 'WMA', 'TMA', 'TRIMA', 'VAR', 'WWMA', 'ZLEMA', 'TSF'], 
+     tooltip='📉 Type de MA',
+     group = 'Filter - Long-term moving average', inline = 'lt_trend_filter_2')
+lt_trend_filter_length = input.int(20, 'MA Length', minval = 1, 
+     tooltip='📏 Période MA (20 pour LT = plus stable)',
+     group = 'Filter - Long-term moving average', inline = 'lt_trend_filter_2')
+
+// Filter #3 -mt_trend_filter
+// V68.6: TF par défaut corrigé (1 → 240), Multiplier ajouté
+mt_trend_filter = input(false, title = '📉 MT Trend Filter', 
+     tooltip='📉 FILTRE TENDANCE MOYEN TERME\n\n💡 Même logique que LT mais TF intermédiaire.\n• Plus réactif que LT\n• Moins de bruit que TF actuel',
+     group = 'Filter - Medium-term moving average', inline = 'mt_trend_filter_1')
+mt_trend_filter_tf = input.timeframe(title = 'TF', defval = '240', 
+     tooltip='⏰ Timeframe tendance MT\nRecommandé: 240 (4H) ou 60 (1H)',
+     group = 'Filter - Medium-term moving average', inline = 'mt_trend_filter_1')
+mt_trend_filter_mult = input.float(1.5, 'Multiplier', options=[0.5, 1.0, 1.5, 2.0, 2.5, 3.0],
+     tooltip='🔢 MULTIPLIER ATR pour PMax HTF\n\n💡 Impact:\n  • 0.5-1.0: Très restrictif (scalping)\n  • 1.5: Équilibré ✅ (recommandé)\n  • 2.0-2.5: Permissif (swing)\n  • 3.0: Très permissif (peu de filtrage)',
+     group = 'Filter - Medium-term moving average', inline = 'mt_trend_filter_1')
+
+mt_trend_filter_mav = input.string(title = 'MA Type', defval = 'EMA', options = ['SMA', 'EMA', 'WMA', 'TMA', 'TRIMA', 'VAR', 'WWMA', 'ZLEMA', 'TSF'], 
+     tooltip='📉 Type de MA',
+     group = 'Filter - Medium-term moving average', inline = 'mt_trend_filter_2')
+mt_trend_filter_length = input.int(10, 'MA Length', minval = 1, 
+     tooltip='📏 Période MA (10 pour MT = équilibré)',
+     group = 'Filter - Medium-term moving average', inline = 'mt_trend_filter_2')
+
+
+///////////////////////////
+// Trade Allowed Filters //
+
+ta1_group = 'Session days and Session hours'
+Day_M = input.bool(true, 'M', group = ta1_group, inline = 'days')
+Day_T = input.bool(true, 'T', group = ta1_group, inline = 'days')
+Day_W = input.bool(true, 'W', group = ta1_group, inline = 'days')
+Day_TH = input.bool(true, 'TH', group = ta1_group, inline = 'days')
+Day_F = input.bool(true, 'F', group = ta1_group, inline = 'days')
+Day_SA = input.bool(true, 'SA', group = ta1_group, inline = 'days')
+Day_S = input.bool(true, 'S', group = ta1_group, inline = 'days')
+
+//Sessions :
+Session = input.session('0000-1200', 'Session 1', confirm = true, 
+     tooltip='⏰ Session de trading #1 (format HHMM-HHMM)',
+     group = ta1_group)
+Session2 = input.session('1200-2359', 'Session 2', confirm = true, 
+     tooltip='⏰ Session de trading #2 (format HHMM-HHMM)',
+     group = ta1_group)
+
+// Filter #10 - WMA SMA
+wma_sma_filter = input.bool(false, '📊 WMA/SMA Filter', 
+     tooltip='📊 FILTRE WMA/SMA\nFiltre basé sur le croisement WMA50/SMA200.\n• Option 1: Sur l\'instrument actuel\n• Option 2: Sur un instrument HTF externe',
+     group = 'Filter - WMA SMA', inline = 'wma_sma_1')
+wma_sma_options = input.string('Option 1', 'WMA SMA Options', options = ['Option 1', 'Option 2'], 
+     tooltip='• Option 1: Instrument actuel\n• Option 2: Instrument externe HTF',
+     group = 'Filter - WMA SMA', inline = 'wma_sma_1')
+
+wma_sma_instrument = input.symbol('DEU40', 'Instrument', 
+     tooltip='🎯 Instrument pour Option 2 (ex: DEU40, SPY)',
+     group = 'Filter - WMA SMA', inline = 'wma_sma_2')
+wma_sma_tf = input.timeframe('', 'TF', 
+     tooltip='⏰ Timeframe pour Option 2',
+     group = 'Filter - WMA SMA', inline = 'wma_sma_2')
+
+
+rel_group = 'Filter - Macro'
+
+// ============================================
+// V68.4 : MACRO FILTER RESTRUCTURÉ
+// Séparation en 2 composantes avec TF indépendants :
+// 1. RELATIVE STRENGTH (RS) : Votre actif vs marché (s1-s10)
+// 2. MARKET CLIMATE : Risk-On/Risk-Off global (s11-s20)
+// ============================================
+
+macro_filter = input.bool(false, '📊 Macro Score Filter', 
+     tooltip='📊 MACRO SCORE FILTER\n\n' +
+             'Analyse 20 indicateurs en 2 catégories :\n\n' +
+             '💪 RELATIVE STRENGTH (10 indicateurs) :\n' +
+             'Votre actif vs USD, EUR, Gold, Bonds, SPY, etc.\n' +
+             '→ "Mon actif surperforme-t-il le marché ?"\n\n' +
+             '🌍 MARKET CLIMATE (10 ratios Risk-On/Off) :\n' +
+             'HYG/TLT, XLY/XLP, SPY/TLT, COPX/GLD, etc.\n' +
+             '→ "Le marché est-il Risk-On ou Risk-Off ?"\n\n' +
+             '✅ Chaque catégorie peut avoir son propre TF',
+     group = rel_group, inline = 'Macro1')
+
+macro_mode = input.string('Combined', 'Mode', 
+     options=['Combined', 'RS Only', 'Climate Only', 'Both Required'],
+     tooltip='🎯 MODE DE FILTRAGE\n\n' +
+             '• Combined : Score total RS + Climate\n' +
+             '• RS Only : Filtre uniquement sur Relative Strength\n' +
+             '• Climate Only : Filtre uniquement sur Market Climate\n' +
+             '• Both Required : RS >= seuil ET Climate >= seuil',
+     group = rel_group, inline = 'Macro1')
+
+// Dynamic Weighting (SMA Fast/Slow on each ratio)
+macro_weight_fast = input.int(10, 'Fast SMA', 
+     minval=1, maxval=50, step=5,
+     tooltip='⚡ Période SMA rapide pour détection de tendance.\n' +
+             'Plus petit = plus réactif.\n' +
+             'Recommandé : 10 (standard), 5 (agressif)',
+     group = rel_group, inline = 'macro_weight')
+
+macro_weight_slow = input.int(50, 'Slow SMA', 
+     minval=1, maxval=200, step=5,
+     tooltip='🐌 Période SMA lente pour confirmation.\n' +
+             'Plus grand = filtre mieux le bruit.\n' +
+             'Recommandé : 50 (standard), 100 (conservateur)',
+     group = rel_group, inline = 'macro_weight')
+
+// ============================================
+// V68.4 : RELATIVE STRENGTH SETTINGS
+// Votre actif comparé aux 10 assets de référence
+// ============================================
+rs_group = 'Filter - Macro RS (Relative Strength)'
+
+rs_tf = input.timeframe('240', 'RS Timeframe', 
+     tooltip='⏰ TIMEFRAME RELATIVE STRENGTH\n\n' +
+             'TF pour analyser votre actif vs marché.\n\n' +
+             '💡 Recommandations :\n' +
+             '  • 60 (H1) : Day trading réactif\n' +
+             '  • 240 (H4) : Swing trading (défaut)\n' +
+             '  • D : Position trading\n\n' +
+             'Plus court = plus réactif aux changements de force',
+     group = rs_group, inline = 'rs1')
+
+rs_min = input.int(-20, 'Min RS', 
+     minval=-20, maxval=20, step=5,
+     tooltip='📊 SCORE RS MINIMUM\n\n' +
+             'Plage : -20 à +20 (10 indicateurs × ±2)\n\n' +
+             '💡 Valeurs :\n' +
+             '  • -20 : Aucun filtrage\n' +
+             '  • -10 : Accepte légère sous-performance\n' +
+             '  • 0 : Actif doit égaler le marché\n' +
+             '  • +5 : Actif doit surperformer',
+     group = rs_group, inline = 'rs1')
+
+rs_max = input.int(20, 'Max RS', 
+     minval=-20, maxval=20, step=5,
+     tooltip='📊 SCORE RS MAXIMUM\n\n' +
+             'Limite haute (rarement utile).\n' +
+             'Mettre +20 pour désactiver.',
+     group = rs_group, inline = 'rs1')
+
+// ============================================
+// V68.4 : MARKET CLIMATE SETTINGS  
+// Ratios Risk-On/Risk-Off (numérateur risqué, dénominateur défensif)
+// ============================================
+climate_group = 'Filter - Macro Climate (Risk-On/Off)'
+
+climate_tf = input.timeframe('D', 'Climate Timeframe', 
+     tooltip='⏰ TIMEFRAME MARKET CLIMATE\n\n' +
+             'TF pour analyser l\'environnement Risk-On/Off.\n\n' +
+             '💡 Recommandations :\n' +
+             '  • 240 (H4) : Plus réactif\n' +
+             '  • D (Daily) : Standard (défaut)\n' +
+             '  • W : Vue très macro\n\n' +
+             'Plus long = climat plus stable, moins de faux signaux',
+     group = climate_group, inline = 'climate1')
+
+climate_min = input.int(-20, 'Min Climate', 
+     minval=-20, maxval=20, step=5,
+     tooltip='🌍 SCORE CLIMATE MINIMUM\n\n' +
+             'Plage : -20 à +20 (10 ratios × ±2)\n\n' +
+             '💡 Interprétation :\n' +
+             '  • < -10 : Fort Risk-Off (peur)\n' +
+             '  • -10 à +10 : Neutre\n' +
+             '  • > +10 : Fort Risk-On (appétit)\n\n' +
+             '💡 Valeurs :\n' +
+             '  • -20 : Aucun filtrage\n' +
+             '  • -5 : Évite Risk-Off extrême\n' +
+             '  • 0 : Uniquement Risk-On\n' +
+             '  • +5 : Risk-On confirmé',
+     group = climate_group, inline = 'climate1')
+
+climate_max = input.int(20, 'Max Climate', 
+     minval=-20, maxval=20, step=5,
+     tooltip='🌍 SCORE CLIMATE MAXIMUM\n\n' +
+             'Limite haute pour éviter euphorie.\n' +
+             'Mettre +20 pour désactiver.',
+     group = climate_group, inline = 'climate1')
+
+// Legacy combined thresholds (pour mode Combined)
+macro_min_to_trade = input.int(-50, 'Min Total', 
+     minval=-50, maxval=50, step=5,
+     tooltip='📊 SCORE TOTAL MINIMUM (Mode Combined)\n\n' +
+             'Score RS + Climate combiné.\n' +
+             'Plage : -40 à +40 typique\n\n' +
+             '⚠️ Utilisé uniquement en mode "Combined"',
+     group = rel_group, inline = 'macro2')
+
+macro_max_to_trade = input.int(50, 'Max Total', 
+     minval=-50, maxval=50, step=5,
+     tooltip='📊 SCORE TOTAL MAXIMUM (Mode Combined)\n\n' +
+             '⚠️ Utilisé uniquement en mode "Combined"',
+     group = rel_group, inline = 'macro2')
+
+rsr_length = input.int(50, 'SMA Length', 
+     minval=10, maxval=200,
+     tooltip='📏 Période SMA pour lissage des ratios.\n' +
+             'Appliqué aux deux catégories.',
+     group = rel_group, inline = 'Macro3')
+
+// ============================================
+// V69.1: VIX Filter DÉPLACÉ vers Security Layer 0
+// Le VIX est maintenant COMPLÈTEMENT indépendant du Macro Filter
+// Il devient le premier filtre de sécurité externe (volatilité du marché)
+// ============================================
+// NOTE: Les inputs VIX sont maintenant dans "Security Layer 0 - VIX"
+// Voir section ci-dessous après les Security Layers existants
+
+// ============================================
+// V68.1: Market Regime Filter SUPPRIMÉ
+// Raison: Redondant avec le Macro Filter qui analyse déjà SPY sous 3 angles:
+//   - s7 = SPY (comparé à votre actif)
+//   - s16 = SPY/TLT (stocks vs bonds)  
+//   - s13 = SPY/VXX (stocks vs volatilité)
+// Le Macro Filter utilise une pondération dynamique SMA plus sophistiquée
+// que le simple Golden Cross MA50/MA200 du Market Regime
+// ============================================
+
+// V67.1 - Macro Filter Symbols
+// When "Macro Filter" is enabled, ALL 20 indicators are analyzed
+// Each gives a score between -2 and +2 (typically -1.5 to +1.5)
+// Total score = sum of all 20 scores
+// Trade allowed if: macro_min_to_trade <= score <= macro_max_to_trade
+
+// ASSETS (s1-s10): Compared to your traded instrument
+// Example: If you trade BTC, s1 = BTC/UUP (BTC strength vs USD)
+s1 = 'AMEX:UUP'              // USD Index (Dollar strength)
+s2 = 'AMEX:FXE'              // Euro (Currency alternative)
+s3 = 'NASDAQ:TLT'            // 20Y Treasury Bonds (Safe haven)
+s4 = 'AMEX:LQD'              // Investment Grade Bonds (Corporate credit)
+s5 = 'AMEX:GLD'              // Gold (Safe haven, inflation hedge)
+s6 = 'AMEX:USO'              // Oil (Energy, inflation indicator)
+s7 = 'AMEX:SPY'              // S&P 500 (US Equities)
+s8 = 'NASDAQ:QQQ'            // Nasdaq 100 (Tech/Growth)
+s9 = 'AMEX:EEM'              // Emerging Markets (Risk appetite)
+s10 = 'AMEX:VNQ'             // Real Estate (Tangible assets)
+
+// RATIOS (s11-s20): Analyzed DIRECTLY (V67.1 correction)
+// These ratios measure macro environment independently of your traded instrument
+s11 = 'AMEX:HYG/NASDAQ:TLT'      // High Yield vs Treasuries (Risk appetite)
+s12 = 'AMEX:XLY/AMEX:XLP'        // Cyclicals vs Defensives (Economic strength)
+s13 = 'AMEX:SPY/CBOE:VXX'        // Stocks vs Volatility (Market sentiment)
+s14 = 'AMEX:COPX/AMEX:GLD'       // Copper vs Gold (Growth vs safety)
+s15 = 'AMEX:EEM/AMEX:UUP'        // Emerging Markets vs USD (Risk-on/off)
+s16 = 'AMEX:SPY/NASDAQ:TLT'      // Stocks vs Bonds (Risk-on/off)
+s17 = 'NASDAQ:SMH/NASDAQ:IEF'    // Semiconductors vs Bonds (Tech strength)
+s18 = 'NASDAQ:IBIT/AMEX:UUP'     // Bitcoin ETF vs USD (Crypto adoption)
+s19 = 'AMEX:XLV/NASDAQ:TLT'      // Healthcare vs Bonds (Defensive rotation)
+s20 = 'AMEX:USO/AMEX:GLD'        // Oil vs Gold (Inflation vs deflation)
+
+// Filter #8/9
+snab_rsi_50_Filter = input.bool(false, title = 'RSI > 50 Filter', 
+     tooltip='📊 Long si RSI > 50, Short si RSI < 50',
+     group = 'Filter - SNAB RSI', inline = 'snab_rsi1')
+snab_rsi_ema_filter = input.bool(false, title = 'RSI > EMA Filter', 
+     tooltip='📈 Long si RSI > EMA(RSI), Short si RSI < EMA(RSI)',
+     group = 'Filter - SNAB RSI', inline = 'snab_rsi1')
+
+snab_rsi_len = input.int(14, minval = 1, title = 'RSI Length', 
+     tooltip='📏 Période RSI',
+     group = 'Filter - SNAB RSI', inline = 'snab_rsi2')
+snab_rsi_ema_len = input.int(12, minval = 1, title = 'EMA of RSI Length', 
+     tooltip='📏 Période EMA appliquée au RSI',
+     group = 'Filter - SNAB RSI', inline = 'snab_rsi2')
+
+// Filter #4 - qq_estimation
+qq_estimation_filter = input.bool(false, 'QQ Estimation Filter', 
+     tooltip='📉 FILTRE QQ ESTIMATION\nBasé sur le croisement RSI lissé et sa direction.\nSignal quand RSI EMA change de direction.',
+     group = 'Filter - QQ Estimation')
+qq_estimation_filter_length = input.int(14, 'RSI Length', minval = 1, 
+     tooltip='📏 Période RSI pour QQ Estimation',
+     group = 'Filter - QQ Estimation')
+
+// ===== V67.0 NEW SECURITY LAYERS =====
+// ===== V69.1: Réorganisation des Security Layers =====
+// Layer 0: VIX (NEW - External Volatility)
+// Layer 1: Volatility (ATR Percentile)
+// Layer 2: Correlation
+// Layer 3: Max Hold Days (ex-Swap Protection, ex-Layer 3b)
+// Layer 4: MTF Momentum
+// Layer 5: Gap Protection
+// ===== V69.1: Time Exit et Regime Filter SUPPRIMÉS =====
+
+// ============================================
+// V69.1: SECURITY LAYER 0 - VIX (EXTERNAL VOLATILITY)
+// Le VIX mesure la volatilité implicite du S&P 500
+// C'est un indicateur de "peur" du marché - externe à votre actif
+// ============================================
+vix_filter = input.bool(false, '📉 VIX Filter', 
+     tooltip='📉 VIX FILTER (Security Layer 0)\n\n' +
+             'Bloque les trades selon le niveau de peur du marché.\n\n' +
+             '💡 Comment ça marche :\n' +
+             '  • VIX < Low → Risk-On (trades autorisés)\n' +
+             '  • VIX > High → Risk-Off (trades bloqués)\n' +
+             '  • Entre les deux → Neutre (trades autorisés)\n\n' +
+             '📊 Le VIX est INDÉPENDANT de votre actif:\n' +
+             '  → Mesure la peur globale du marché\n' +
+             '  → Premier filtre de sécurité externe\n\n' +
+             '✅ V69.1: Déplacé en Security Layer 0 (avant Layer 1)',
+     group = 'Security Layer 0 - VIX', inline = 'vix1')
+
+vix_threshold_low = input.int(10, 'Low (Risk-On)', 
+     minval=5, maxval=50, step=5,
+     tooltip='🟢 VIX Low Threshold\n' +
+             'VIX < cette valeur = Risk-On (peur faible).\n\n' +
+             '💡 Valeurs historiques typiques :\n' +
+             '  • 10-12 : VIX très bas (marché complaisant)\n' +
+             '  • 15-18 : VIX normal (conditions saines)\n' +
+             '  • 20+ : VIX élevé (stress détecté)\n\n' +
+             '💡 Incréments de 5 (saisie manuelle possible)',
+     group = 'Security Layer 0 - VIX', inline = 'vix1')
+
+vix_threshold_high = input.int(30, 'High (Risk-Off)', 
+     minval=10, maxval=80, step=5,
+     tooltip='🔴 VIX High Threshold\n' +
+             'VIX > cette valeur = Risk-Off (peur élevée).\n\n' +
+             '💡 Valeurs de référence :\n' +
+             '  • 25 : Début de stress\n' +
+             '  • 30-35 : Peur modérée\n' +
+             '  • 40+ : Panique (marchés très volatils)\n' +
+             '  • 80 : Désactive cette limite haute\n\n' +
+             '💡 Incréments de 5 (saisie manuelle possible)',
+     group = 'Security Layer 0 - VIX', inline = 'vix1')
+
+// ============================================
+// V68.0 PHASE 2.2 : Security Layers with Tooltips
+// ============================================
+
+// Layer 1: Adaptive Volatility Filter
+vol_adaptive_filter = input.bool(false, 'Adaptive Volatility Filter', 
+     tooltip='🌪️ ADAPTIVE VOLATILITY FILTER\n\n' +
+             'Bloque les trades en période de volatilité extrême.\n\n' +
+             '💡 Comment ça marche :\n' +
+             '  • Calcule le percentile ATR sur 100 barres\n' +
+             '  • Bloque si volatility > percentile max\n\n' +
+             '✅ Optimisé V68.0 : 100x plus rapide (ta.percentrank)',
+     group = 'Security Layer 1 - Volatility', inline = 'vol1')
+
+vol_percentile = input.int(70, 'Max Volatility Percentile', 
+     minval=50, maxval=95,
+     tooltip='📉 Percentile Threshold\n' +
+             'Limite maximale de volatilité acceptée.\n\n' +
+             '  • 70 = bloque si dans top 30% volatility\n' +
+             '  • 80 = bloque si dans top 20% volatility\n' +
+             '  • 90 = bloque si dans top 10% volatility\n\n' +
+             'Recommandé : 70-75',
+     group = 'Security Layer 1 - Volatility', inline = 'vol1')
+
+// Layer 2: Correlation Filter
+correlation_filter = input.bool(false, 'Correlation Filter', 
+     tooltip='🔗 CORRELATION FILTER\n\n' +
+             'Vérifie la corrélation avec un asset de référence.\n\n' +
+             '💡 Utilité :\n' +
+             '  • Long si forte corrélation positive\n' +
+             '  • Short si forte corrélation négative\n' +
+             '  • Évite trades décorrélés du marché\n\n' +
+             '✅ Corrigé V68.0 : Bug tuple résolu',
+     group = 'Security Layer 2 - Correlation', inline = 'corr1')
+
+corr_asset = input.symbol('AMEX:SPY', 'Correlation Asset', 
+     tooltip='🎯 Reference Asset\n' +
+             'Asset de référence pour calculer la corrélation.\n' +
+             'Recommandé : SPY (S&P 500)',
+     group = 'Security Layer 2 - Correlation', inline = 'corr2')
+
+corr_length = input.int(20, 'Correlation Length', 
+     minval=10, maxval=100,
+     tooltip='📏 Lookback Period\n' +
+             'Nombre de barres pour calculer la corrélation.\n' +
+             'Recommandé : 20',
+     group = 'Security Layer 2 - Correlation', inline = 'corr3')
+
+corr_threshold = input.float(0.5, 'Min Correlation', 
+     minval=-1.0, maxval=1.0, step=0.1,
+     tooltip='🎯 Correlation Threshold\n' +
+             'Corrélation minimale requise pour trader.\n\n' +
+             '  • +0.5 = forte corrélation positive\n' +
+             '  • +0.7 = très forte (recommandé)\n' +
+             '  • -0.5 = forte corrélation négative',
+     group = 'Security Layer 2 - Correlation', inline = 'corr3')
+
+// ============================================
+// V69.1: TIME EXIT SUPPRIMÉ (ancien Layer 3)
+// Raison: Redondant avec Max Hold Days (jours calendaires)
+// Max Hold Days est plus universel car basé sur le temps réel
+// ============================================
+
+// ============================================
+// V69.1: SECURITY LAYER 3 - MAX HOLD DAYS
+// Anciennement "Layer 3b - Swap Protection"
+// Promu en Layer 3 principal après suppression de Time Exit
+// ============================================
+max_hold_days_filter = input.bool(false, '📅 Max Hold Days', 
+     tooltip='📅 MAX HOLD DAYS (Security Layer 3)\n\n' +
+             'Ferme automatiquement les positions après X jours calendaires.\n\n' +
+             '💡 Utilité :\n' +
+             '  • Limite les frais de swap/overnight\n' +
+             '  • Évite les positions "zombies"\n' +
+             '  • Fonctionne sur TOUS les timeframes\n\n' +
+             '⚠️ Calcul basé sur le temps réel (pas les barres)\n' +
+             '→ 3 jours = 3 jours que vous soyez en M1 ou D1\n\n' +
+             '✅ V69.1: Promu en Layer 3 (Time Exit supprimé)',
+     group = 'Security Layer 3 - Max Hold Days', inline = 'maxdays1')
+
+max_hold_days = input.int(5, 'Max Days', 
+     minval=1, maxval=30, step=1,
+     tooltip='📊 Durée Maximum de Détention\n\n' +
+             'Nombre de jours calendaires avant sortie forcée.\n\n' +
+             '💡 Recommandations selon style :\n' +
+             '  • Scalping : 1-2 jours\n' +
+             '  • Day Trading : 1-3 jours\n' +
+             '  • Swing : 5-10 jours\n' +
+             '  • Position : 10-30 jours\n\n' +
+             '💰 Impact Swap (exemple forex) :\n' +
+             '  • 1 jour = ~0.01-0.03% de frais\n' +
+             '  • 5 jours = ~0.05-0.15% de frais\n' +
+             '  • 30 jours = ~0.3-0.9% de frais',
+     group = 'Security Layer 3 - Max Hold Days', inline = 'maxdays1')
+
+max_hold_days_profit_exception = input.bool(true, 'Profit Exception', 
+     tooltip='💰 EXCEPTION SI EN PROFIT\n\n' +
+             '• ON : Ne ferme PAS si position en profit > seuil\n' +
+             '• OFF : Ferme TOUJOURS après X jours\n\n' +
+             '💡 Recommandé : ON\n' +
+             'Permet de laisser courir les gagnants tout en\n' +
+             'coupant les positions stagnantes/perdantes.',
+     group = 'Security Layer 3 - Max Hold Days', inline = 'maxdays2')
+
+max_hold_days_profit_pct = input.float(1.0, 'Min Profit %', 
+     minval=0.0, maxval=10.0, step=0.5,
+     tooltip='📊 Profit Minimum pour Exception\n\n' +
+             'Si profit >= ce % après X jours → position conservée.\n' +
+             'Sinon → sortie forcée.\n\n' +
+             '💡 Valeurs recommandées :\n' +
+             '  • 0.5% : Conservateur\n' +
+             '  • 1.0% : Standard\n' +
+             '  • 2.0% : Agressif (exige plus de profit)',
+     group = 'Security Layer 3 - Max Hold Days', inline = 'maxdays2')
+
+// Layer 4: Multi-Timeframe Momentum
+mtf_momentum_filter = input.bool(false, 'Multi-TF Momentum', 
+     tooltip='🔄 MULTI-TIMEFRAME MOMENTUM\n\n' +
+             'Analyse momentum sur 3 timeframes simultanément.\n\n' +
+             '💡 Comment ça marche :\n' +
+             '  • RSI + MACD sur chaque TF\n' +
+             '  • Score total = somme des 3 TF\n' +
+             '  • Long si score >= +2, Short si <= -2\n\n' +
+             '✅ Optimisé V68.0 : Calculs conditionnels',
+     group = 'Security Layer 4 - MTF Momentum', inline = 'mtf1')
+
+mtf_tf1 = input.timeframe('15', 'TF1', 
+     tooltip='⏰ Timeframe 1 (court terme)\n' +
+             'Recommandé : 15 ou 5 pour day trading',
+     group = 'Security Layer 4 - MTF Momentum', inline = 'mtf1')
+
+mtf_tf2 = input.timeframe('60', 'TF2', 
+     tooltip='⏰ Timeframe 2 (moyen terme)\n' +
+             'Recommandé : 60 ou H4',
+     group = 'Security Layer 4 - MTF Momentum', inline = 'mtf2')
+
+mtf_tf3 = input.timeframe('D', 'TF3', 
+     tooltip='⏰ Timeframe 3 (long terme)\n' +
+             'Recommandé : D (daily) ou W (weekly)',
+     group = 'Security Layer 4 - MTF Momentum', inline = 'mtf2')
+
+// Layer 5: Gap Protection
+gap_protection = input.bool(false, 'Gap Protection', 
+     tooltip='🚫 GAP PROTECTION\n\n' +
+             'Évite les trades après un gap important.\n\n' +
+             '💡 Utilité :\n' +
+             '  • Protège contre la volatilité post-gap\n' +
+             '  • Évite les faux signaux\n' +
+             '  • Utile pour crypto (gaps week-end)',
+     group = 'Security Layer 5 - Gap Protection', inline = 'gap1')
+
+max_gap_pct = input.float(2.0, 'Max Gap %', 
+     minval=0.5, maxval=10.0, step=0.1,
+     tooltip='📊 Max Gap Size\n' +
+             'Gap maximum toléré (en %).\n\n' +
+             '  • 2% = bloque si gap > 2%\n' +
+             '  • 5% = moins restrictif\n\n' +
+             'Recommandé : 2-3% pour forex/stocks, 5% pour crypto',
+     group = 'Security Layer 5 - Gap Protection', inline = 'gap1')
+
+// ============================================
+// ============================================
+// V69.1: REGIME FILTER SUPPRIMÉ (Security Layer 6 → SUPPRIMÉ)
+// Raison: Redondant avec Security Layer 1 (Volatility - ATR percentile)
+// Le Layer 1 fait déjà le même type d'analyse avec ta.percentrank(ATR)
+// ============================================
+
+// ATR EMA
+ta3_group = 'Filter - ATR EMA'
+use_atr_ema_allowed = input.bool(false, title = '📉 ATR EMA Filter', 
+     tooltip='📉 FILTRE ATR EMA\nAutorise les trades uniquement quand EMA1(ATR) < EMA2(ATR).\nFiltre les périodes de volatilité croissante.',
+     group = ta3_group, inline = 'atr_ema_1')
+atr_ema_len = input.int(14, title = 'ATR Length', 
+     tooltip='📏 Période ATR',
+     group = ta3_group, inline = 'atr_ema_1')
+ema1_atr_ema_len = input.int(10, title = 'EMA1 len', 
+     tooltip='⚡ EMA rapide de l\'ATR',
+     group = ta3_group, inline = 'atr_ema_2')
+ema2_atr_ema_len = input.int(20, title = 'EMA2 len', 
+     tooltip='🐢 EMA lente de l\'ATR',
+     group = ta3_group, inline = 'atr_ema_2')
+
+// Diff between Signal and Setup
+ta4_group = 'Filter - Max Candles'
+use_max_candles_allowed = input(false, title = '⏱️ Max Candles Filter', 
+     tooltip='⏱️ FILTRE MAX CANDLES\nAnnule l\'ordre si le signal date de trop longtemps.\nÉvite d\'entrer sur des signaux obsolètes.',
+     group = ta4_group, inline = 'cadnles')
+max_candles_allowed = input(100, title = 'Candles Count', 
+     tooltip='📊 Nombre max de barres après le setup.\nDéfaut: 100 (permissif pour tester le setup brut)',
+     group = ta4_group, inline = 'cadnles')
+
+/////////////
+// FILTERS //
+
+// Filter #1
+ma_dir_filter = input(false, title = '📈 MA Direction Filter', 
+     tooltip='📈 FILTRE DIRECTION MA\nLong si MA monte sur X barres consécutives.\nShort si MA descend sur X barres consécutives.',
+     group = 'Filter - MAvg Direction', inline = 'ma_dir_filt')
+ma_dir_len = input.int(3, title = 'MA Direction Len', 
+     tooltip='📏 Nombre de barres consécutives dans la même direction',
+     group = 'Filter - MAvg Direction', inline = 'ma_dir_filt')
+
+// Filter #5 - MAvg
+mavg_filter = input(false, title = '📉 MAvg Filter', 
+     tooltip='📉 FILTRE MAVG\nLong si MA au-dessus de PMax.\nShort si MA en-dessous de PMax.',
+     group = 'Filter - MAvg')
+
+// Filter #6 - Diff between moving average and redline
+// V68.5 BUG FIX: Renommé en "Max Diff" pour clarté
+diff_ma_red_filter = input(false, '📏 Diff MA/Red Filter', 
+     tooltip='📏 FILTRE DISTANCE MAX MA/REDLINE\n\n💡 Comment ça marche :\n  • Distance > X% → Trade BLOQUÉ\n  • Distance ≤ X% → Trade AUTORISÉ\n\n✅ Évite les trades quand MA trop éloignée de PMax.\nRecommandé : 1-2%',
+     group = 'Filter - Diff. MA and Red Line', inline = 'filter_diff_ma')
+diff_ma_red_filter_percentage = input(1.0, 'Max Diff (%)', 
+     tooltip='📊 Distance MAXIMUM en % entre MA et PMax',
+     group = 'Filter - Diff. MA and Red Line', inline = 'filter_diff_ma') / 100
+
+// Filter #7 - Diff between price and redline
+// V68.5 BUG FIX: Renommé en "Max Diff" pour clarté
+diff_ma_price_filter = input(false, '💹 Diff Price/Red Filter', 
+     tooltip='💹 FILTRE DISTANCE MAX PRICE/REDLINE\n\n💡 Comment ça marche :\n  • Distance > X% → Trade BLOQUÉ\n  • Distance ≤ X% → Trade AUTORISÉ\n\n✅ Évite les trades quand prix trop éloigné de PMax.\nRecommandé : 1-2%',
+     group = 'Filter - Diff. Price and Red Line', inline = 'filter_diff_price')
+diff_ma_price_filter_percentage = input(1.0, 'Max Diff (%)', 
+     tooltip='📊 Distance MAXIMUM en % entre Prix et PMax',
+     group = 'Filter - Diff. Price and Red Line', inline = 'filter_diff_price') / 100
+
+// ============================================
+// V69.1: ADX REGIME FILTER (ex-Strategy Hint)
+// Transformé de simple indication à FILTRE ACTIF
+// Bloque les entry types incompatibles avec le régime ADX
+// ============================================
+use_adx_regime_filter = input.bool(false, '📊 ADX Regime Filter', 
+     tooltip='📊 ADX REGIME FILTER (V.69.1)\n\n' +
+             '🆕 FILTRE ACTIF (pas juste une indication!)\n' +
+             'Bloque les entry types incompatibles avec le régime.\n\n' +
+             '📊 Classification par ADX:\n' +
+             '  • ADX > 25 → TREND mode\n' +
+             '    ✅ Autorisés: Donc+Chikou, Fractal, ORB, MM Cross\n' +
+             '    ❌ Bloqués: VWAP, Boll+SMA\n\n' +
+             '  • ADX < 20 → REVERSION mode\n' +
+             '    ✅ Autorisés: VWAP, Boll+SMA, RSI Div\n' +
+             '    ❌ Bloqués: Donc+Chikou, Fractal, ORB, MM Cross\n\n' +
+             '  • ADX 20-25 → MIXED mode\n' +
+             '    ✅ Tous les entry types autorisés\n\n' +
+             '⚠️ Note: RSI Divergence est TOUJOURS autorisé (polyvalent)',
+     group = 'ADX Regime Filter V.69.1', inline = 'adx1')
+
+show_strategy_hint = input.bool(true, 'Show Hint', 
+     tooltip='💡 Affiche la table Strategy Hint\n' +
+             'Montre le régime actuel et les recommandations\n' +
+             'Indépendant du filtre (info uniquement)',
+     group = 'ADX Regime Filter V.69.1', inline = 'adx1')
+
+adx_hint_length = input.int(14, 'ADX Period', 
+     minval=7, maxval=30, step=1,
+     tooltip='📊 Période de l\'ADX\n\n' +
+             '  • 14 = Standard (recommandé)\n' +
+             '  • 7-10 = Plus réactif\n' +
+             '  • 20-30 = Plus stable',
+     group = 'ADX Regime Filter V.69.1', inline = 'adx2')
+
+adx_trend_threshold = input.int(25, 'Trend >', 
+     minval=20, maxval=35, step=1,
+     tooltip='📈 Seuil TREND\n\n' +
+             'ADX > ce seuil = marché tendanciel\n' +
+             '→ Entry Types TREND: Donc+Chikou, Fractal, ORB, MM Cross\n\n' +
+             '  • 25 = Standard (recommandé)\n' +
+             '  • 30 = Plus conservateur',
+     group = 'ADX Regime Filter V.69.1', inline = 'adx2')
+
+adx_reversion_threshold = input.int(20, 'Reversion <', 
+     minval=15, maxval=25, step=1,
+     tooltip='📉 Seuil REVERSION\n\n' +
+             'ADX < ce seuil = marché en range\n' +
+             '→ Entry Types REVERSION: VWAP, Boll+SMA, RSI Div\n\n' +
+             '  • 20 = Standard (recommandé)\n' +
+             '  • 15 = Plus restrictif',
+     group = 'ADX Regime Filter V.69.1', inline = 'adx2')
+
+
+/////////////
+// STYLING //
+
+show_filter_lbl = input.bool(true, 'Show Filter As Labels', 
+     tooltip='🏷️ Affiche les labels de filtre sur le graphique',
+     group = 'Styling')
+long_label_col = input.color(color.new(color.green, 50), title = 'Long', 
+     tooltip='🟢 Couleur des signaux Long',
+     inline = 'label_col0', group = 'Styling')
+short_label_col = input.color(color.new(color.red, 50), title = 'Short', 
+     tooltip='🔴 Couleur des signaux Short',
+     inline = 'label_col0', group = 'Styling')
+flat_label_col = input.color(color.new(color.gray, 50), title = 'Flat', 
+     tooltip='⚪ Couleur quand aucun filtre actif',
+     inline = 'label_col0', group = 'Styling')
+show_final_entries_labels = input.bool(false, 'Show Final Entries as Labels', 
+     tooltip='🎯 Affiche L/S sur le graphique aux entrées finales',
+     group = 'Styling')
+
+//}
+
+// Risk Management - ENHANCED V67
+
+sl_mode = input.string('Static - %', 'SL Mode', options = ['No', 'Static - %', 'Red Line', 'ATR-Based'], 
+     tooltip='🛡️ MODE STOP LOSS\n• No: Pas de SL\n• Static %: SL fixe en % du prix\n• Red Line: SL sur la ligne PMax\n• ATR-Based: SL dynamique basé sur ATR',
+     group = 'Risk Management')
+sl_percent = input.float(30, 'Static SL (%)', 
+     tooltip='📊 Distance SL en % du prix d\'entrée.\n30% = valeur large pour test brut.\nRecommandé après optimisation: 1-5%',
+     group = 'Risk Management')
+atr_sl_mult = input.float(2.0, 'ATR Multiple (SL)', minval=0.5, maxval=5.0, step=0.5, 
+     tooltip='📈 Multiplicateur ATR pour le SL.\nSL = Entry - (ATR × Mult).\nRecommandé: 1.5-3.0',
+     group = 'Risk Management')
+
+// ============================================
+// V69 FEATURE #1: DYNAMIC SL MULTIPLIER
+// Le SL s'adapte automatiquement selon la volatilité relative
+// vol_ratio = ATR(14) / ATR(50)
+// ============================================
+sl_dynamic_adjust = input.bool(true, '🔄 Dynamic SL Adjustment', 
+     tooltip='🔄 DYNAMIC SL ADJUSTMENT (V.69)\n\n' +
+             '💡 Le multiplicateur ATR s\'adapte selon la volatilité:\n' +
+             '  • vol_ratio = ATR(14) / ATR(50)\n\n' +
+             '📈 vol_ratio > 1.2 (marché volatile):\n' +
+             '  → Élargit le SL (jusqu\'à +50%)\n' +
+             '  → Évite les stops prématurés\n\n' +
+             '📉 vol_ratio < 0.8 (marché calme):\n' +
+             '  → Resserre le SL (jusqu\'à -20%)\n' +
+             '  → Protège mieux les gains\n\n' +
+             '⚙️ Formule: dynamic_mult = base_mult × clamp(vol_ratio, min, max)',
+     group = 'Risk Management', inline = 'sl_dyn1')
+sl_vol_min_mult = input.float(0.8, 'Vol Min', minval=0.5, maxval=1.0, step=0.05,
+     tooltip='📉 Multiplicateur MINIMUM (marché calme)\n\n' +
+             '• 0.8 = Resserre le SL de 20% max\n' +
+             '• 0.9 = Resserre le SL de 10% max\n' +
+             '• 1.0 = Pas de resserrement',
+     group = 'Risk Management', inline = 'sl_dyn1')
+sl_vol_max_mult = input.float(1.5, 'Vol Max', minval=1.0, maxval=2.0, step=0.1,
+     tooltip='📈 Multiplicateur MAXIMUM (marché volatile)\n\n' +
+             '• 1.5 = Élargit le SL de 50% max (recommandé)\n' +
+             '• 1.3 = Élargit le SL de 30% max\n' +
+             '• 2.0 = Élargit le SL de 100% max (très large)',
+     group = 'Risk Management', inline = 'sl_dyn1')
+
+pt_mode = input.string('No', 'PT Mode', options = ['No', 'Static - %', 'Static - Red Line %', 'SL Ratio'], 
+     tooltip='🎯 MODE PROFIT TARGET\n• No: Pas de PT\n• Static %: PT fixe en %\n• Red Line %: PT basé sur distance PMax\n• SL Ratio: PT = SL × ratio (R:R)',
+     group = 'Risk Management')
+pt_rl_percent = input.float(100, 'PT - Red Line distance (%)', 
+     tooltip='📊 PT = distance à PMax × ce %.\n100% = même distance que PMax',
+     group = 'Risk Management')
+pt_percent = input.float(2, 'PT - Percent (%)', 
+     tooltip='📊 PT fixe en % du prix d\'entrée',
+     group = 'Risk Management', inline = 'pt2')
+pt_rr_ratio = input.float(2, 'PT - SL Ratio', 
+     tooltip='📊 Ratio Risk:Reward.\n2 = PT est 2× le SL',
+     group = 'Risk Management', inline = 'pt2')
+
+// Partial Profit Taking
+partial_tp = input.bool(false, 'Partial TP', 
+     tooltip='💰 PARTIAL TAKE PROFIT\nFerme une partie de la position à TP1 et TP2.\nPermet de sécuriser des gains progressivement.',
+     group = 'Risk Management', inline = 'ptp1')
+tp1_pct = input.float(1.0, 'TP1 %', step=0.1, 
+     tooltip='🎯 Premier niveau de prise de profit en %',
+     group = 'Risk Management', inline = 'ptp2')
+tp1_size = input.int(30, 'TP1 Size %', minval=10, maxval=50, 
+     tooltip='📊 % de la position fermée à TP1',
+     group = 'Risk Management', inline = 'ptp2')
+tp2_pct = input.float(2.0, 'TP2 %', step=0.1, 
+     tooltip='🎯 Deuxième niveau de prise de profit en %',
+     group = 'Risk Management', inline = 'ptp3')
+tp2_size = input.int(30, 'TP2 Size %', minval=10, maxval=50, 
+     tooltip='📊 % de la position fermée à TP2',
+     group = 'Risk Management', inline = 'ptp3')
+
+be_mode = input.string('No', 'BE Mode', options = ['No', 'BE + TP', 'BE + TP + TSL', 'BE + TPx2 + TSL'], 
+     tooltip='🛡️ MODE BREAKEVEN\n• No: Pas de BE\n• BE + TP: SL au BE quand PT atteint\n• BE + TP + TSL: + Trailing Stop\n• BE + TPx2 + TSL: 2 niveaux TP + TSL',
+     group = 'Risk Management')
+be_percent = input.float(50, 'BE - Percent (%)', 
+     tooltip='📊 BE déclenché quand le prix atteint X% de la distance vers PT',
+     group = 'Risk Management')
+
+// Dynamic Trailing Stop Loss
+dynamic_tsl = input.bool(false, 'Dynamic TSL', 
+     tooltip='📈 TRAILING STOP DYNAMIQUE\n\n' +
+             '🎯 Concept :\n' +
+             'Le stop-loss SUIT le prix à une distance fixe (ATR × Mult).\n' +
+             'Il monte avec le prix (Long) mais ne redescend JAMAIS.\n' +
+             'Il descend avec le prix (Short) mais ne remonte JAMAIS.\n\n' +
+             '💡 Exemple (Long, ATR=2, Mult=2) :\n' +
+             '  Entrée 100 → TSL = 96\n' +
+             '  Prix monte à 105 → TSL = 101 (⬆️ protège gains)\n' +
+             '  Prix baisse à 102 → TSL reste 101 (ne descend pas)\n' +
+             '  Prix touche 101 → STOP ✅ Profit protégé!\n\n' +
+             '⚙️ Recommandations Mult :\n' +
+             '  • Crypto (volatile) : 2.5 - 3.0\n' +
+             '  • Forex (normal) : 2.0\n' +
+             '  • Indices (calme) : 1.5',
+     group = 'Risk Management', inline = 'dtsl1')
+tsl_atr_mult = input.float(2.0, 'TSL ATR Mult', step=0.5, minval=0.5, maxval=5.0, 
+     tooltip='📈 TSL ATR MULTIPLICATEUR\n\n' +
+             'Distance du trailing stop = ATR(14) × ce multiplicateur.\n\n' +
+             'Plus grand = stop plus éloigné :\n' +
+             '  • Avantage : moins de stops prématurés\n' +
+             '  • Inconvénient : moins de profits protégés\n\n' +
+             'Plus petit = stop plus proche :\n' +
+             '  • Avantage : protège plus de gains\n' +
+             '  • Inconvénient : risque de sortie prématurée',
+     group = 'Risk Management', inline = 'dtsl1')
+
+tsl_frac_tf = input.timeframe('D', title = 'TSL Fractal TF', 
+     tooltip='⏰ TSL FRACTAL TIMEFRAME\n\n' +
+             'Utilisé quand Dynamic TSL = OFF.\n\n' +
+             'Le stop se place sur les derniers niveaux fractals\n' +
+             '(hauts/bas significatifs) du timeframe choisi.\n\n' +
+             'Plus grand TF = niveaux plus stables mais plus éloignés.',
+     group = 'Risk Management', inline = 'TSL')
+tsl_show = input.bool(false, title = 'Show on Chart', 
+     tooltip='🎨 Affiche le niveau TSL sur le graphique',
+     group = 'Risk Management', inline = 'TSL')
+
+bars_in_loss_enable = input(false, '⏱️ Max Bars in Loss', 
+     tooltip='⏱️ SORTIE TEMPS EN PERTE\nFerme la position si en perte depuis X barres.\nÉvite les positions stagnantes.',
+     group = 'Risk Management', inline = 'bars_in_loss')
+bars_in_loss = input(55, 'Bars Count', 
+     tooltip='📊 Nombre max de barres en perte avant sortie',
+     group = 'Risk Management', inline = 'bars_in_loss')
+
+exit_at_reverse_setup = input.bool(true, 'Exit at Setup Reversal', 
+     tooltip='🔄 Ferme la position si un signal inverse apparaît.\nRecommandé: ON',
+     group = 'Risk Management')
+
+// PineConnector Code            
+symbol_pc = input.string('BTCUSDT', 'Symbol as shown in MT4', 
+     tooltip='🎯 Symbole EXACTEMENT comme affiché dans MT4/MT5.\nExemples: EURUSD, BTCUSDT, XAUUSD',
+     group = 'PineConnector')
+risk_lot_size_pc = input.float(1.0, 'Risk/Lot Size', 
+     tooltip='💰 Taille du lot ou % de risque selon config PineConnector',
+     group = 'PineConnector')
+
+send_sl = input.bool(true, 'Send SL in Alert', 
+     tooltip='🛡️ Inclure le SL dans le message d\'alerte',
+     group = 'PineConnector')
+send_pt = input.bool(true, 'Send PT in Alert', 
+     tooltip='🎯 Inclure le PT dans le message d\'alerte',
+     group = 'PineConnector')
+
+///////////////
+// FUNCTIONS /{
+
+InSession(sess) =>
+    not na(time(timeframe.period, sess))
+
+Var_Func(src, length) =>
+    valpha = 2 / (length + 1)
+    vud1 = src > src[1] ? src - src[1] : 0
+    vdd1 = src < src[1] ? src[1] - src : 0
+    vUD = math.sum(vud1, 9)
+    vDD = math.sum(vdd1, 9)
+    vCMO = nz((vUD - vDD) / (vUD + vDD))
+    VAR = 0.0
+    VAR := nz(valpha * math.abs(vCMO) * src) + (1 - valpha * math.abs(vCMO)) * nz(VAR[1])
+    VAR
+
+Wwma_Func(src, length) =>
+    wwalpha = 1 / length
+    WWMA = 0.0
+    WWMA := wwalpha * src + (1 - wwalpha) * nz(WWMA[1])
+    WWMA
+
+Zlema_Func(src, length) =>
+    zxLag = length / 2 == math.round(length / 2) ? length / 2 : (length - 1) / 2
+    zxEMAData = src + src - src[zxLag]
+    ZLEMA = ta.ema(zxEMAData, length)
+    ZLEMA
+
+Tsf_Func(src, length) =>
+    lrc = ta.linreg(src, length, 0)
+    lrc1 = ta.linreg(src, length, 1)
+    lrs = lrc - lrc1
+    TSF = ta.linreg(src, length, 0) + lrs
+    TSF
+
+getMA(src, length, mav_type) =>
+    ma = 0.0
+    if mav_type == 'SMA'
+        ma := ta.sma(src, length)
+        ma
+    if mav_type == 'EMA'
+        ma := ta.ema(src, length)
+        ma
+    if mav_type == 'WMA'
+        ma := ta.wma(src, length)
+        ma
+    if mav_type == 'TMA'
+        ma := ta.sma(ta.sma(src, math.ceil(length / 2)), math.floor(length / 2) + 1)
+        ma
+    if mav_type == 'TRIMA'
+        // V69.2 FIX: Vraie TRIMA (double SMA) - était un simple WMA par erreur
+        ma := ta.sma(ta.sma(src, math.ceil(length / 2)), math.floor(length / 2) + 1)
+        ma
+    if mav_type == 'VAR'
+        ma := Var_Func(src, length)
+        ma
+    if mav_type == 'WWMA'
+        ma := Wwma_Func(src, length)
+        ma
+    if mav_type == 'ZLEMA'
+        ma := Zlema_Func(src, length)
+        ma
+    if mav_type == 'TSF'
+        ma := Tsf_Func(src, length)
+        ma
+    ma
+
+Check_Day_Condition_Func() =>
+    daysCondition = dayofweek == dayofweek.monday and Day_M or dayofweek == dayofweek.tuesday and Day_T or dayofweek == dayofweek.wednesday and Day_W or dayofweek == dayofweek.thursday and Day_TH or dayofweek == dayofweek.friday and Day_F or dayofweek == dayofweek.saturday and Day_SA or dayofweek == dayofweek.sunday and Day_S
+    daysCondition
+
+// ===== V67.1 NEW FUNCTIONS (CORRECTED) =====
+
+// ============================================
+// V68.4 : FONCTIONS MACRO SÉPARÉES (RS + Climate)
+// ============================================
+
+// Fonction pour RELATIVE STRENGTH (votre actif vs assets de référence)
+// Utilise rs_tf (timeframe RS)
+// V68.7.1 FIX: Gestion correcte des valeurs na pour éviter biais négatif
+getRSR_strength(ticker, tf) =>
+    // Pour les assets simples : Compare votre actif vs asset de référence
+    sym1 = request.security(syminfo.tickerid, tf, close, lookahead=barmerge.lookahead_off)
+    sym2 = request.security(ticker, tf, close, lookahead=barmerge.lookahead_off)
+    // Protection division par zéro ET valeurs na
+    ratio = (not na(sym2) and sym2 != 0 and not na(sym1)) ? sym1 / sym2 : na
+    
+    // Apply dynamic SMA weighting
+    sma_fast = ta.sma(ratio, macro_weight_fast)
+    sma_slow = ta.sma(ratio, macro_weight_slow)
+    
+    // V68.7.1 FIX: Si sma_fast ou sma_slow sont na, retourner 0 (neutre)
+    // Évite le biais négatif quand les données sont manquantes
+    score = na(sma_fast) or na(sma_slow) ? 0 : sma_fast > sma_slow ? 1 : -1
+    
+    // Momentum factor
+    // V68.7.1 FIX: Protection complète contre na ET zéro
+    momentum = (not na(ratio) and not na(ratio[5]) and ratio[5] != 0) ? (ratio - ratio[5]) / ratio[5] * 100 : 0.0
+    
+    // V68.7.1 FIX: Si score est 0 (données manquantes), ne pas appliquer le momentum
+    score_final = score == 0 ? 0.0 : score * (1 + math.abs(momentum) / 10)
+    
+    float(score_final)
+
+// Fonction pour MARKET CLIMATE (ratios Risk-On/Risk-Off)
+// Utilise climate_tf (timeframe Climate)
+// V68.7.1 FIX: Gestion correcte des valeurs na pour éviter biais négatif
+getRSR_climate(ticker, tf) =>
+    // Les ratios sont analysés DIRECTEMENT (numérateur Risk-On / dénominateur Risk-Off)
+    // Ratio monte = Risk-On, Ratio baisse = Risk-Off
+    ratio = request.security(ticker, tf, close, lookahead=barmerge.lookahead_off)
+    
+    // Apply dynamic SMA weighting
+    sma_fast = ta.sma(ratio, macro_weight_fast)
+    sma_slow = ta.sma(ratio, macro_weight_slow)
+    
+    // V68.7.1 FIX: Si sma_fast ou sma_slow sont na, retourner 0 (neutre)
+    // Évite le biais négatif quand les données sont manquantes
+    score = na(sma_fast) or na(sma_slow) or na(ratio) ? 0 : sma_fast > sma_slow ? 1 : -1
+    
+    // Momentum factor
+    // V68.7.1 FIX: Protection complète contre na ET zéro
+    momentum = (not na(ratio) and not na(ratio[5]) and ratio[5] != 0) ? (ratio - ratio[5]) / ratio[5] * 100 : 0.0
+    
+    // V68.7.1 FIX: Si score est 0 (données manquantes), ne pas appliquer le momentum
+    score_final = score == 0 ? 0.0 : score * (1 + math.abs(momentum) / 10)
+    
+    float(score_final)
+
+// Legacy function (compatibilité)
+// V68.7.1 FIX: Même corrections appliquées pour cohérence
+getRSR_weighted(ticker) =>
+    is_ratio = str.contains(ticker, '/')
+    float ratio = na
+    
+    if is_ratio
+        ratio := request.security(ticker, climate_tf, close, lookahead=barmerge.lookahead_off)
+    else
+        sym1 = request.security(syminfo.tickerid, rs_tf, close, lookahead=barmerge.lookahead_off)
+        sym2 = request.security(ticker, rs_tf, close, lookahead=barmerge.lookahead_off)
+        ratio := (not na(sym2) and sym2 != 0 and not na(sym1)) ? sym1 / sym2 : na
+    
+    sma_fast = ta.sma(ratio, macro_weight_fast)
+    sma_slow = ta.sma(ratio, macro_weight_slow)
+    // V68.7.1 FIX: Gestion des na
+    score = na(sma_fast) or na(sma_slow) ? 0 : sma_fast > sma_slow ? 1 : -1
+    momentum = (not na(ratio) and not na(ratio[5]) and ratio[5] != 0) ? (ratio - ratio[5]) / ratio[5] * 100 : 0.0
+    score_final = score == 0 ? 0.0 : score * (1 + math.abs(momentum) / 10)
+    
+    float(score_final)
+
+// ============================================
+// V68.1: getMarketRegime() SUPPRIMÉ - Fonction redondante avec Macro Filter
+// ============================================
+
+// ============================================
+// V68.0 PHASE 1.6 CORRECTION : Volatility Filter
+// BUG FIXED: Loop optimization using native ta.percentrank (100x faster)
+// OPTIMIZATION: Manual loop replaced with built-in function
+// ============================================
+getVolatilityFilter() =>
+    // V68.2: Calcul local ATR (fonction appelée avant déclaration globale)
+    atr_local = ta.atr(14)
+    atr_pct = (atr_local / close) * 100
+    
+    // V68.0: Use native percentrank function (much faster than manual loop)
+    percentile = ta.percentrank(atr_pct, 100)
+    
+    // Allow only if volatility is reasonable
+    percentile <= vol_percentile
+
+// ============================================
+// V68.0 PHASE 1.5 CORRECTION : Correlation Filter
+// BUG FIXED: Function now accepts pre-fetched reference data
+// BEFORE: request.security always executed inside function
+// AFTER: Data fetched conditionally outside, function checks for na
+// ============================================
+// V68.7.1 FIX: Logique corrigée pour condition Short
+// AVANT: Short seulement si corrélation <= -threshold (très restrictif, rare)
+// APRÈS: Short autorisé si corrélation est significative (positive OU négative)
+//        car une forte corrélation (même positive) signifie que l'actif suit le marché
+//        et donc les signaux short du système sont valides
+// LOGIQUE:
+//   - Corrélation >= +threshold : Actif suit le marché → Long ET Short OK
+//   - Corrélation <= -threshold : Actif inverse du marché → Long ET Short OK (inversés)
+//   - Corrélation entre -threshold et +threshold : Actif décorrélé → Prudence
+getCorrelation(ref_data) =>
+    if na(ref_data)
+        [true, true]  // Filter disabled = authorize all trades
+    else
+        // Main instrument returns
+        returns_main = (close - close[1]) / close[1]
+        
+        // Reference asset returns (using pre-fetched data)
+        // V68.1: Protection division par zéro
+        returns_ref = ref_data[1] != 0 ? (ref_data - ref_data[1]) / ref_data[1] : 0
+        
+        // Calculate correlation
+        mean_main = ta.sma(returns_main, corr_length)
+        mean_ref = ta.sma(returns_ref, corr_length)
+        
+        numerator = ta.sma((returns_main - mean_main) * (returns_ref - mean_ref), corr_length)
+        denominator = ta.stdev(returns_main, corr_length) * ta.stdev(returns_ref, corr_length)
+        
+        correlation = denominator != 0 ? numerator / denominator : 0
+        
+        // V68.7.1 FIX: Nouvelle logique basée sur la FORCE de corrélation
+        // Si la corrélation est forte (positive OU négative), l'actif est prévisible
+        // → On autorise les trades dans les deux directions
+        // Si la corrélation est faible (proche de 0), l'actif est imprévisible
+        // → On bloque les trades
+        abs_correlation = math.abs(correlation)
+        is_correlated = abs_correlation >= corr_threshold
+        
+        // Long: Autorisé si actif est corrélé au marché (positivement ou négativement)
+        // Short: Autorisé si actif est corrélé au marché (positivement ou négativement)
+        [is_correlated, is_correlated]
+
+// V67.0 - Multi-Timeframe Momentum
+// V68.0 PHASE 3: Anti-repainting protection added
+getMTFMomentum(tf) =>
+    rsi_val = request.security(syminfo.tickerid, tf, ta.rsi(close, 14), lookahead=barmerge.lookahead_off)
+    [macdLine, signalLine, histLine] = request.security(syminfo.tickerid, tf, ta.macd(close, 12, 26, 9), lookahead=barmerge.lookahead_off)
+    
+    // Score: +1 if positive momentum, -1 if negative
+    score = (rsi_val > 50 ? 1 : -1) + (histLine > 0 ? 1 : -1)
+    score
+
+//}
+
+/////////////////////
+// MAIN CALCULATION /
+
+src = input(close, 'Source')
+
+// V68.2: ATR centralisés pour éviter calculs redondants
+ATR = ta.atr(length)
+atr_14_global = ta.atr(14)  // Utilisé par: SL, TSL (Volatility Filter calcule localement)
+nLoss = Multiplier * ATR
+
+MAvg = getMA(src, length, mav)
+longStop = MAvg - nLoss
+longStopPrev = nz(longStop[1], longStop)
+longStop := MAvg > longStopPrev ? math.max(longStop, longStopPrev) : longStop
+
+shortStop = MAvg + nLoss
+shortStopPrev = nz(shortStop[1], shortStop)
+shortStop := MAvg < shortStopPrev ? math.min(shortStop, shortStopPrev) : shortStop
+
+dir = 1
+dir := nz(dir[1], dir)
+dir := dir == -1 and MAvg > shortStopPrev ? 1 : dir == 1 and MAvg < longStopPrev ? -1 : dir
+
+PMax = dir == 1 ? longStop : shortStop
+
+buySignalk = MAvg > PMax and MAvg[1] <= PMax[1]
+sellSignallk = MAvg < PMax and MAvg[1] >= PMax[1]
+
+// V68.8: Fonction pmax_htf_filter avec multiplier configurable
+// CORRECTION V68.8: Retour à la logique V63 (ÉTAT CONTINU au lieu de CROSSOVER)
+// - V68.6-V68.7.1 utilisait: MAvg > PMax AND MAvg[1] <= PMax[1] (CROSSOVER = 1 barre)
+// - V68.8 utilise: MAvg[1] > PMax[1] (ÉTAT CONTINU = tant que tendance haussière)
+pmax_htf_filter(len, mav_type, mult) =>
+    lengthhtf = len
+
+    ATR_HTF = ta.atr(lengthhtf)
+    nLoss_HTF = mult * ATR_HTF  // V68.6: Utilise le multiplier passé en paramètre
+
+    MAvg_HTF = getMA(src, lengthhtf, mav_type)
+    longStop_HTF = MAvg_HTF - nLoss_HTF
+    longStopPrev_HTF = nz(longStop_HTF[1], longStop_HTF)
+    longStop_HTF := MAvg_HTF > longStopPrev_HTF ? math.max(longStop_HTF, longStopPrev_HTF) : longStop_HTF
+
+    shortStop_HTF = MAvg_HTF + nLoss_HTF
+    shortStopPrev_HTF = nz(shortStop_HTF[1], shortStop_HTF)
+    shortStop_HTF := MAvg_HTF < shortStopPrev_HTF ? math.min(shortStop_HTF, shortStopPrev_HTF) : shortStop_HTF
+
+    dir_HTF = 1
+    dir_HTF := nz(dir_HTF[1], dir_HTF)
+    dir_HTF := dir_HTF == -1 and MAvg_HTF > shortStopPrev_HTF ? 1 : dir_HTF == 1 and MAvg_HTF < longStopPrev_HTF ? -1 : dir_HTF
+
+    PMax_HTF = dir_HTF == 1 ? longStop_HTF : shortStop_HTF
+
+    // V68.8 CORRECTION: État continu (comme V63) au lieu de crossover
+    // AVANT: buySignalk_HTF = MAvg_HTF > PMax_HTF and MAvg_HTF[1] <= PMax_HTF[1]  // CROSSOVER
+    // APRÈS: État continu = true tant que MA est au-dessus de PMax
+    MAvg_HTF[1] > PMax_HTF[1]
+
+// calcSlope SUPPRIMÉ en V68.7 (Entry Linear supprimée)
+// Économie: ~10% performance (boucle lourde supprimée)
+
+///////////////////
+// WMA SMA Filter /
+
+wma_50 = ta.wma(close, 50)
+sma_200 = ta.sma(close, 200)
+
+// V68.2: request.security conditionnels (économise 2 appels si filtre OFF ou Option 1)
+wma_50_htf = (wma_sma_filter and wma_sma_options == 'Option 2') ? request.security(wma_sma_instrument, wma_sma_tf, ta.wma(close, 50), lookahead=barmerge.lookahead_off) : na
+sma_200_htf = (wma_sma_filter and wma_sma_options == 'Option 2') ? request.security(wma_sma_instrument, wma_sma_tf, ta.sma(close, 200), lookahead=barmerge.lookahead_off) : na
+
+wma_sma_filter_long = wma_sma_filter ? wma_sma_options == 'Option 1' ? wma_50 > sma_200 : wma_50_htf > sma_200_htf : true
+wma_sma_filter_short = wma_sma_filter ? wma_sma_options == 'Option 1' ? wma_50 < sma_200 : wma_50_htf < sma_200_htf : true
+
+//Relative Strength Ratio - ENHANCED V67.0
+
+getRSR(ticker) =>
+    // V68.0 PHASE 3: Anti-repainting protection
+    sym1 = request.security(syminfo.tickerid, rs_tf, close, lookahead=barmerge.lookahead_off)
+    sym2 = request.security(ticker, rs_tf, close, lookahead=barmerge.lookahead_off)
+    // V68.1: Protection division par zéro
+    ratio = (sym2 != 0 and not na(sym2)) ? sym1 / sym2 : na
+    ratio_avg = ta.sma(ratio, rsr_length)
+    not na(ratio) and ratio > ratio_avg ? 1 : -1
+
+// ============================================
+// V68.4 : MACRO SCORE CALCULATION (RS + Climate séparés)
+// RS utilise rs_tf, Climate utilise climate_tf
+// ============================================
+
+// Fonction pour calculer le score RELATIVE STRENGTH (s1-s10)
+// Votre actif comparé aux 10 assets de référence
+getRelativeStrengthScore() =>
+    float rs_total = 0.0
+    rs_total := rs_total + getRSR_strength(s1, rs_tf)   // vs USD Index
+    rs_total := rs_total + getRSR_strength(s2, rs_tf)   // vs Euro
+    rs_total := rs_total + getRSR_strength(s3, rs_tf)   // vs Treasury Bonds
+    rs_total := rs_total + getRSR_strength(s4, rs_tf)   // vs Corporate Bonds
+    rs_total := rs_total + getRSR_strength(s5, rs_tf)   // vs Gold
+    rs_total := rs_total + getRSR_strength(s6, rs_tf)   // vs Oil
+    rs_total := rs_total + getRSR_strength(s7, rs_tf)   // vs S&P 500
+    rs_total := rs_total + getRSR_strength(s8, rs_tf)   // vs Nasdaq
+    rs_total := rs_total + getRSR_strength(s9, rs_tf)   // vs Emerging Markets
+    rs_total := rs_total + getRSR_strength(s10, rs_tf)  // vs Real Estate
+    rs_total
+
+// Fonction pour calculer le score MARKET CLIMATE (s11-s20)
+// Ratios Risk-On/Risk-Off (numérateur risqué / dénominateur défensif)
+getMarketClimateScore() =>
+    float climate_total = 0.0
+    climate_total := climate_total + getRSR_climate(s11, climate_tf)  // HYG/TLT (Credit risk appetite)
+    climate_total := climate_total + getRSR_climate(s12, climate_tf)  // XLY/XLP (Economic strength)
+    climate_total := climate_total + getRSR_climate(s13, climate_tf)  // SPY/VXX (Sentiment)
+    climate_total := climate_total + getRSR_climate(s14, climate_tf)  // COPX/GLD (Growth vs Safety)
+    climate_total := climate_total + getRSR_climate(s15, climate_tf)  // EEM/UUP (EM vs USD)
+    climate_total := climate_total + getRSR_climate(s16, climate_tf)  // SPY/TLT (Stocks vs Bonds)
+    climate_total := climate_total + getRSR_climate(s17, climate_tf)  // SMH/IEF (Tech strength)
+    climate_total := climate_total + getRSR_climate(s18, climate_tf)  // IBIT/UUP (Crypto/Risk extreme)
+    climate_total := climate_total + getRSR_climate(s19, climate_tf)  // XLV/TLT (Healthcare rotation)
+    climate_total := climate_total + getRSR_climate(s20, climate_tf)  // USO/GLD (Inflation indicator)
+    climate_total
+
+// Legacy function (compatibilité mode Combined)
+getMacroScoreTotal() =>
+    getRelativeStrengthScore() + getMarketClimateScore()
+
+// V68.4: Calcul conditionnel des scores séparés
+macro_rs = macro_filter ? getRelativeStrengthScore() : 0.0
+macro_climate = macro_filter ? getMarketClimateScore() : 0.0
+macro = macro_rs + macro_climate  // Score total
+
+// ============================================
+// V68.0 PHASE 1.2 CORRECTION : VIX Regime Filter
+// ============================================
+
+// VIX request conditionnel (utilise climate_tf car c'est un indicateur de sentiment)
+vix_value = vix_filter ? request.security('CBOE:VIX', climate_tf, close, lookahead=barmerge.lookahead_off) : na
+
+vix_regime = vix_filter ? (vix_value < vix_threshold_low ? 1 : vix_value > vix_threshold_high ? -1 : 0) : 0
+
+vix_filter_long = vix_filter ? vix_regime >= 0 : true
+vix_filter_short = vix_filter ? vix_regime <= 0 : true
+
+// ============================================
+// V68.4 : MACRO FILTER LOGIC (4 modes)
+// ============================================
+
+// Calcul des conditions selon le mode choisi
+rs_condition_long = macro_rs >= rs_min and macro_rs <= rs_max
+rs_condition_short = macro_rs >= rs_min and macro_rs <= rs_max
+climate_condition_long = macro_climate >= climate_min and macro_climate <= climate_max
+climate_condition_short = macro_climate >= climate_min and macro_climate <= climate_max
+combined_condition_long = macro >= macro_min_to_trade and macro <= macro_max_to_trade
+combined_condition_short = macro >= macro_min_to_trade and macro <= macro_max_to_trade
+
+// Application selon le mode
+macro_score_filter_long = macro_filter ? (
+     macro_mode == 'Combined' ? combined_condition_long :
+     macro_mode == 'RS Only' ? rs_condition_long :
+     macro_mode == 'Climate Only' ? climate_condition_long :
+     macro_mode == 'Both Required' ? (rs_condition_long and climate_condition_long) : true
+     ) : true
+
+macro_score_filter_short = macro_filter ? (
+     macro_mode == 'Combined' ? combined_condition_short :
+     macro_mode == 'RS Only' ? rs_condition_short :
+     macro_mode == 'Climate Only' ? climate_condition_short :
+     macro_mode == 'Both Required' ? (rs_condition_short and climate_condition_short) : true
+     ) : true
+
+// V69.1: VIX séparé du Macro Filter (maintenant Security Layer 0)
+// Le Macro Filter ne combine plus le VIX - ils sont indépendants
+macro_filter_long = macro_filter ? macro_score_filter_long : true
+macro_filter_short = macro_filter ? macro_score_filter_short : true
+// Note: vix_filter_long/short sont ajoutés séparément dans filter_all_long/short
+
+// ===== V67.1 SECURITY LAYERS =====
+
+// ============================================
+// V68.0 PHASE 1.6 CORRECTION : Volatility Filter
+// OPTIMIZED: Now uses ta.percentrank (100x faster)
+// Wrapped for conditional execution
+// ============================================
+// Layer 1: Adaptive Volatility Filter
+// Blocks trades when volatility is in top X percentile (default: 70%)
+vol_filter_result = vol_adaptive_filter ? getVolatilityFilter() : true
+vol_filter_long = vol_filter_result
+vol_filter_short = vol_filter_result
+
+// ============================================
+// V68.0 PHASE 1.5 CORRECTION : Correlation Filter
+// BUG FIXED: Tuple reassignment corrected
+// BEFORE: Variables assigned in if block were local (masking globals)
+// AFTER: Pre-fetch data conditionally, call function, assign results
+// ============================================
+// Layer 2: Correlation Filter
+// Checks correlation with reference asset (default: SPY)
+
+// V68.0: Conditional request.security for correlation asset
+// V68.0 PHASE 3: Anti-repainting protection
+ref_close_corr = correlation_filter ? request.security(corr_asset, timeframe.period, close, lookahead=barmerge.lookahead_off) : na
+
+// Call function with pre-fetched data (or na if disabled)
+[corr_long_result, corr_short_result] = getCorrelation(ref_close_corr)
+corr_filter_long = corr_long_result
+corr_filter_short = corr_short_result
+
+// ============================================
+// V68.0 PHASE 1.4 CORRECTION : Multi-Timeframe Momentum
+// BUG FIXED: MTF calculations now conditional
+// BEFORE: 6 request.security() always executed (3 TFs × 2 calls each)
+// AFTER: Wrapped in conditional function call
+// PERFORMANCE: -100% external requests when filter disabled
+// ============================================
+// Layer 4: Multi-Timeframe Momentum
+
+// V68.0: Wrapper function for conditional MTF calculation
+getMTFScoreTotal() =>
+    getMTFMomentum(mtf_tf1) + getMTFMomentum(mtf_tf2) + getMTFMomentum(mtf_tf3)
+
+mtf_score_total = mtf_momentum_filter ? getMTFScoreTotal() : 0
+mtf_momentum_long = mtf_momentum_filter ? mtf_score_total >= 2 : true
+mtf_momentum_short = mtf_momentum_filter ? mtf_score_total <= -2 : true
+
+// Layer 5: Gap Protection
+// V68.0 PHASE 4: BUG #7 FIXED - Simplified redundant logic
+// OLD: not gap_detected or gap_size < max_gap_pct (redundant)
+// NEW: gap_size <= max_gap_pct (clean and clear)
+gap_size = math.abs((open - close[1]) / close[1]) * 100
+gap_filter_long = gap_protection ? gap_size <= max_gap_pct : true
+gap_filter_short = gap_protection ? gap_size <= max_gap_pct : true
+
+// ============================================
+// V69.1: REGIME FILTER (Layer 6) SUPPRIMÉ
+// Raison: Redondant avec Security Layer 1 (Volatility ATR percentile)
+// ============================================
+
+///////////////
+// ENTRIES   /{
+
+get_fractal_levels() =>
+    n = 2
+    upFractal_def_int = high[n + 2] < high[n] and high[n + 1] < high[n] and high[n - 1] < high[n] and high[n - 2] < high[n] or high[n + 3] < high[n] and high[n + 2] < high[n] and high[n + 1] == high[n] and high[n - 1] < high[n] and high[n - 2] < high[n] or high[n + 4] < high[n] and high[n + 3] < high[n] and high[n + 2] == high[n] and high[n + 1] <= high[n] and high[n - 1] < high[n] and high[n - 2] < high[n] or high[n + 5] < high[n] and high[n + 4] < high[n] and high[n + 3] == high[n] and high[n + 2] == high[n] and high[n + 1] <= high[n] and high[n - 1] < high[n] and high[n - 2] < high[n] or high[n + 6] < high[n] and high[n + 5] < high[n] and high[n + 4] == high[n] and high[n + 3] <= high[n] and high[n + 2] == high[n] and high[n + 1] <= high[n] and high[n - 1] < high[n] and high[n - 2] < high[n]
+    dnFractal_def_int = low[n + 2] > low[n] and low[n + 1] > low[n] and low[n - 1] > low[n] and low[n - 2] > low[n] or low[n + 3] > low[n] and low[n + 2] > low[n] and low[n + 1] == low[n] and low[n - 1] > low[n] and low[n - 2] > low[n] or low[n + 4] > low[n] and low[n + 3] > low[n] and low[n + 2] == low[n] and low[n + 1] >= low[n] and low[n - 1] > low[n] and low[n - 2] > low[n] or low[n + 5] > low[n] and low[n + 4] > low[n] and low[n + 3] == low[n] and low[n + 2] == low[n] and low[n + 1] >= low[n] and low[n - 1] > low[n] and low[n - 2] > low[n] or low[n + 6] > low[n] and low[n + 5] > low[n] and low[n + 4] == low[n] and low[n + 3] >= low[n] and low[n + 2] == low[n] and low[n + 1] >= low[n] and low[n - 1] > low[n] and low[n - 2] > low[n]
+
+    frac_high_level_int = 0.0
+    frac_low_level_int = 0.0
+
+    frac_high_level_int := upFractal_def_int ? high[n] + fractal_buffer_point : nz(frac_high_level_int[1])
+    frac_low_level_int := dnFractal_def_int ? low[n] - fractal_buffer_point : nz(frac_low_level_int[1])
+    [frac_high_level_int, frac_low_level_int]
+
+// Fractals
+n = 2
+upFractal_def = high[n + 2] < high[n] and high[n + 1] < high[n] and high[n - 1] < high[n] and high[n - 2] < high[n] or high[n + 3] < high[n] and high[n + 2] < high[n] and high[n + 1] == high[n] and high[n - 1] < high[n] and high[n - 2] < high[n] or high[n + 4] < high[n] and high[n + 3] < high[n] and high[n + 2] == high[n] and high[n + 1] <= high[n] and high[n - 1] < high[n] and high[n - 2] < high[n] or high[n + 5] < high[n] and high[n + 4] < high[n] and high[n + 3] == high[n] and high[n + 2] == high[n] and high[n + 1] <= high[n] and high[n - 1] < high[n] and high[n - 2] < high[n] or high[n + 6] < high[n] and high[n + 5] < high[n] and high[n + 4] == high[n] and high[n + 3] <= high[n] and high[n + 2] == high[n] and high[n + 1] <= high[n] and high[n - 1] < high[n] and high[n - 2] < high[n]
+
+dnFractal_def = low[n + 2] > low[n] and low[n + 1] > low[n] and low[n - 1] > low[n] and low[n - 2] > low[n] or low[n + 3] > low[n] and low[n + 2] > low[n] and low[n + 1] == low[n] and low[n - 1] > low[n] and low[n - 2] > low[n] or low[n + 4] > low[n] and low[n + 3] > low[n] and low[n + 2] == low[n] and low[n + 1] >= low[n] and low[n - 1] > low[n] and low[n - 2] > low[n] or low[n + 5] > low[n] and low[n + 4] > low[n] and low[n + 3] == low[n] and low[n + 2] == low[n] and low[n + 1] >= low[n] and low[n - 1] > low[n] and low[n - 2] > low[n] or low[n + 6] > low[n] and low[n + 5] > low[n] and low[n + 4] == low[n] and low[n + 3] >= low[n] and low[n + 2] == low[n] and low[n + 1] >= low[n] and low[n - 1] > low[n] and low[n - 2] > low[n]
+
+frac_high_level = 0.0
+frac_low_level = 0.0
+
+frac_high_level := upFractal_def ? high[n] + fractal_buffer_point : nz(frac_high_level[1])
+frac_low_level := dnFractal_def ? low[n] - fractal_buffer_point : nz(frac_low_level[1])
+
+
+
+// V68.0 PHASE 3: Anti-repainting protection
+[tsl_frac_high, tsl_frac_low] = request.security(syminfo.tickerid, tsl_frac_tf, get_fractal_levels(), lookahead=barmerge.lookahead_off)
+
+buy_fractal = close < frac_high_level
+sell_fractal = close > frac_low_level
+
+// These variables allow only 1 entry per unuque fractal level
+fractal_high_order_created = false
+fractal_high_order_created := buy_fractal and not fractal_high_order_created[1] ? true : frac_high_level != frac_high_level[1] or buySignalk ? false : fractal_high_order_created[1]
+
+//bgcolor(fractal_high_order_created ? color.new(color.green, 80) : na)
+
+fractal_low_order_created = false
+fractal_low_order_created := sell_fractal and not fractal_low_order_created[1] ? true : frac_low_level != frac_low_level[1] or sellSignallk ? false : fractal_low_order_created[1]
+
+// Boll+SMA entry
+basis_bb_ma = ta.sma(close, length_bb_ma)
+dev_bb_ma = mult_bb_ma * ta.stdev(close, length_bb_ma)
+upper_bb_ma = basis_bb_ma + dev_bb_ma
+lower_bb_ma = basis_bb_ma - dev_bb_ma
+
+sma_50 = ta.sma(close, length_bb_sma)
+
+buy_boll_ma = sma_50 <= lower_bb_ma
+sell_boll_ma = sma_50 >= upper_bb_ma
+
+// Determine entry prices
+sl_fractal_trail_start_long = false
+sl_fractal_trail_start_short = false
+
+sl_fractal_trail_start_long := sl_fractal_trail_start_long[1]
+sl_fractal_trail_start_short := sl_fractal_trail_start_short[1]
+
+// ===== ENTRY #1 - VWAP + BANDES (V68.7) =====
+// 📊 Mean reversion institutionnel
+// LONG: Prix touche bande INFÉRIEURE → rebond
+// SHORT: Prix touche bande SUPÉRIEURE → rejet
+
+// Calcul VWAP (intraday reset)
+vwap_value = ta.vwap(hlc3)
+vwap_stddev = ta.stdev(close, vwap_length)
+vwap_upper = vwap_value + vwap_stddev * vwap_stddev_mult
+vwap_lower = vwap_value - vwap_stddev * vwap_stddev_mult
+
+// Conditions d'entrée VWAP
+// LONG: Prix touche/traverse la bande inférieure
+vwap_touch_lower = low <= vwap_lower
+vwap_bullish_candle = close > open  // Bougie haussière de confirmation
+vwap_long_signal = vwap_confirmation ? (vwap_touch_lower[1] and vwap_bullish_candle) : vwap_touch_lower
+
+// SHORT: Prix touche/traverse la bande supérieure  
+vwap_touch_upper = high >= vwap_upper
+vwap_bearish_candle = close < open  // Bougie baissière de confirmation
+vwap_short_signal = vwap_confirmation ? (vwap_touch_upper[1] and vwap_bearish_candle) : vwap_touch_upper
+
+// Variables pour entry (compatibilité avec le reste du code)
+buy_vwap_entry = vwap_long_signal
+sell_vwap_entry = vwap_short_signal
+
+// ENTRY #5 - ORB 
+
+var orbHighPrice = 0.0
+var orbLowPrice = 0.0
+
+first_bar = session.isfirstbar_regular
+
+close_time = 0
+close_time := first_bar ? time + openingRangeMinutes * 60 * 1000 : nz(close_time[1])
+
+if first_bar
+    orbHighPrice := high
+    orbLowPrice := low
+    orbLowPrice
+else if time <= close_time
+    orbHighPrice := math.max(orbHighPrice, high)
+    orbLowPrice := math.min(orbLowPrice, low)
+    orbLowPrice
+
+var orb_formed = false
+orb_formed := first_bar ? false : time >= close_time ? true : orb_formed
+
+// Entry #6 - Donchian Chikou 
+
+// Calculate Chikou Span
+chikouSpan = close[26]
+
+// Donchian Levels Calculation
+don_upperBand = ta.highest(high, don_length)
+don_lowerBand = ta.lowest(low, don_length)
+
+// Entry Conditions
+don_long = ta.crossover(close, don_upperBand[26])
+don_short = ta.crossunder(close, don_lowerBand[26])
+
+// ===== ENTRY #7 - RSI DIVERGENCE (V68.9) =====
+// 📊 Detection des divergences entre le prix et le RSI
+// Divergence haussiere (bullish): Prix fait lower low, RSI fait higher low
+// Divergence baissiere (bearish): Prix fait higher high, RSI fait lower high
+// Hidden bullish: Prix fait higher low, RSI fait lower low (continuation)
+// Hidden bearish: Prix fait lower high, RSI fait higher high (continuation)
+
+// Calcul du RSI
+rsi_div_value = ta.rsi(close, rsi_div_length)
+
+// Detection des pivots sur le prix
+// Pivot haut: le point le plus haut avec rsi_div_pivot_lookback barres de chaque cote
+// Pivot bas: le point le plus bas avec rsi_div_pivot_lookback barres de chaque cote
+price_pivot_high = ta.pivothigh(high, rsi_div_pivot_lookback, rsi_div_pivot_lookback)
+price_pivot_low = ta.pivotlow(low, rsi_div_pivot_lookback, rsi_div_pivot_lookback)
+
+// Detection des pivots sur le RSI
+rsi_pivot_high = ta.pivothigh(rsi_div_value, rsi_div_pivot_lookback, rsi_div_pivot_lookback)
+rsi_pivot_low = ta.pivotlow(rsi_div_value, rsi_div_pivot_lookback, rsi_div_pivot_lookback)
+
+// Variables pour stocker les niveaux des derniers pivots
+var float last_price_low = na
+var float last_rsi_low = na
+var int last_price_low_bar = na
+var float last_price_high = na
+var float last_rsi_high = na
+var int last_price_high_bar = na
+
+// Mise a jour des pivots bas (pour divergence haussiere)
+if not na(price_pivot_low)
+    // Sauvegarder le pivot precedent avant mise a jour
+    prev_price_low = last_price_low
+    prev_rsi_low = last_rsi_low
+    prev_price_low_bar = last_price_low_bar
+
+    // Mettre a jour avec le nouveau pivot
+    last_price_low := price_pivot_low
+    last_rsi_low := nz(rsi_pivot_low, rsi_div_value[rsi_div_pivot_lookback])
+    last_price_low_bar := bar_index - rsi_div_pivot_lookback
+
+// Mise a jour des pivots hauts (pour divergence baissiere)
+if not na(price_pivot_high)
+    // Sauvegarder le pivot precedent avant mise a jour
+    prev_price_high = last_price_high
+    prev_rsi_high = last_rsi_high
+    prev_price_high_bar = last_price_high_bar
+
+    // Mettre a jour avec le nouveau pivot
+    last_price_high := price_pivot_high
+    last_rsi_high := nz(rsi_pivot_high, rsi_div_value[rsi_div_pivot_lookback])
+    last_price_high_bar := bar_index - rsi_div_pivot_lookback
+
+// Variables pour les signaux de divergence
+var bool bullish_div_signal = false
+var bool bearish_div_signal = false
+var bool hidden_bullish_div_signal = false
+var bool hidden_bearish_div_signal = false
+
+// Reset des signaux a chaque barre
+bullish_div_signal := false
+bearish_div_signal := false
+hidden_bullish_div_signal := false
+hidden_bearish_div_signal := false
+
+// Detection de divergence haussiere reguliere
+// Prix fait lower low (prix actuel < prix precedent)
+// RSI fait higher low (RSI actuel > RSI precedent)
+// = Le momentum ralentit malgre la baisse des prix -> retournement haussier imminent
+if not na(price_pivot_low) and not na(last_price_low[1])
+    current_price_low = price_pivot_low
+    prev_price_low_val = last_price_low[1]
+    current_rsi_low = nz(rsi_pivot_low, rsi_div_value[rsi_div_pivot_lookback])
+    prev_rsi_low_val = last_rsi_low[1]
+
+    // Regular Bullish Divergence: Prix LL, RSI HL
+    if current_price_low < prev_price_low_val and current_rsi_low > prev_rsi_low_val
+        bullish_div_signal := true
+
+    // Hidden Bullish Divergence: Prix HL, RSI LL (continuation haussiere)
+    if rsi_div_detect_hidden and current_price_low > prev_price_low_val and current_rsi_low < prev_rsi_low_val
+        hidden_bullish_div_signal := true
+
+// Detection de divergence baissiere reguliere
+// Prix fait higher high (prix actuel > prix precedent)
+// RSI fait lower high (RSI actuel < RSI precedent)
+// = Le momentum ralentit malgre la hausse des prix -> retournement baissier imminent
+if not na(price_pivot_high) and not na(last_price_high[1])
+    current_price_high = price_pivot_high
+    prev_price_high_val = last_price_high[1]
+    current_rsi_high = nz(rsi_pivot_high, rsi_div_value[rsi_div_pivot_lookback])
+    prev_rsi_high_val = last_rsi_high[1]
+
+    // Regular Bearish Divergence: Prix HH, RSI LH
+    if current_price_high > prev_price_high_val and current_rsi_high < prev_rsi_high_val
+        bearish_div_signal := true
+
+    // Hidden Bearish Divergence: Prix LH, RSI HH (continuation baissiere)
+    if rsi_div_detect_hidden and current_price_high < prev_price_high_val and current_rsi_high > prev_rsi_high_val
+        hidden_bearish_div_signal := true
+
+// Signaux combines pour l'entry
+buy_rsi_div = (bullish_div_signal or hidden_bullish_div_signal)
+sell_rsi_div = (bearish_div_signal or hidden_bearish_div_signal)
+
+
+//}
+
+// ===== ENTRY #8 - MM CROSS (V69.2) =====
+// Croisement de 2 moyennes mobiles indépendantes du PMax
+// LONG: MM1 (rapide) croise MM2 (lente) à la hausse
+// SHORT: MM1 (rapide) croise MM2 (lente) à la baisse
+// ⚠️ Utilise uniquement EMA et TRIMA (pas getMA complet)
+
+// Fonction helper pour calculer EMA ou TRIMA
+getMM_Cross_MA(src, length, ma_type) =>
+    ma_type == 'TRIMA' ? ta.sma(ta.sma(src, math.ceil(length / 2)), math.floor(length / 2) + 1) : ta.ema(src, length)
+
+// Calcul des 2 moyennes mobiles
+mm_cross_ma1 = getMM_Cross_MA(close, mm_cross_ma1_len, mm_cross_ma1_type)
+mm_cross_ma2 = getMM_Cross_MA(close, mm_cross_ma2_len, mm_cross_ma2_type)
+
+// Signaux de croisement
+buy_mm_cross = ta.crossover(mm_cross_ma1, mm_cross_ma2)
+sell_mm_cross = ta.crossunder(mm_cross_ma1, mm_cross_ma2)
+
+// État du croisement (pour cancel: reste vrai tant que MM1 > MM2 pour long, etc.)
+mm_cross_long_state = mm_cross_ma1 > mm_cross_ma2
+mm_cross_short_state = mm_cross_ma1 < mm_cross_ma2
+
+
+///////////////////
+// ENTRY ALLOWED /{
+
+// #1 - Session
+checkSession = InSession(Session + ':1234567')[1]
+checkSession2 = InSession(Session2 + ':1234567')[1]
+
+allowed_session = (checkSession or checkSession2) and Check_Day_Condition_Func()
+
+// #2 - Allowed range
+// V68.0 PHASE 3: Anti-repainting protection
+[maxr, minr] = request.security(syminfo.tickerid, tf, [ta.highest(close, fiblength), ta.lowest(close, fiblength)], lookahead=barmerge.lookahead_off)
+ranr = maxr - minr
+
+lev_1     = maxr
+lev_0_764 = maxr - 0.236 * ranr
+lev_0_618 = maxr - 0.382 * ranr
+lev_0_50  = maxr - 0.50  * ranr
+lev_0_382 = minr + 0.382 * ranr
+lev_0_236 = minr + 0.236 * ranr
+lev_0     = minr
+
+in_fib_zone1 = close >= lev_0     and close <= lev_0_236
+in_fib_zone2 = close >= lev_0_236 and close <= lev_0_382
+in_fib_zone3 = close >= lev_0_382 and close <= lev_0_50
+in_fib_zone4 = close >= lev_0_50  and close <= lev_0_618
+in_fib_zone5 = close >= lev_0_618 and close <= lev_0_764
+in_fib_zone6 = close >= lev_0_764 and close <= lev_1
+
+allowed_range = (fib_zone1 and in_fib_zone1) or (fib_zone2 and in_fib_zone2) or (fib_zone3 and in_fib_zone3) or 
+                 (fib_zone4 and in_fib_zone4) or (fib_zone5 and in_fib_zone5) or (fib_zone6 and in_fib_zone6)
+
+// #3 - Allowed ATR EMA
+atr_14 = ta.atr(atr_ema_len)
+ema10_atr = ta.ema(atr_14, ema1_atr_ema_len)
+ema20_atr = ta.ema(atr_14, ema2_atr_ema_len)
+allowed_atr_ema = use_atr_ema_allowed ? ema10_atr < ema20_atr : true
+
+// #4 - Allowed Between Signals
+candles_signal = 0.0
+candles_signal := buySignalk ? 1 : sellSignallk ? -1 : nz(candles_signal[1]) + math.sign(candles_signal[1])
+
+allowed_between_signals = use_max_candles_allowed ? math.abs(candles_signal) <= max_candles_allowed : true
+allowed_between_signals_cancel = use_max_candles_allowed ? math.abs(candles_signal) >= max_candles_allowed : false
+
+entry_allowed = allowed_session and allowed_between_signals and allowed_range and allowed_atr_ema
+
+//}
+
+/////////////
+// FILTERS /{
+
+// Filter #1 - ma direction 
+ma_dir_filtter_long = ma_dir_filter ? math.sum(MAvg > MAvg[1] ? 1 : 0, ma_dir_len) == ma_dir_len : true
+ma_dir_filtter_short = ma_dir_filter ? math.sum(MAvg < MAvg[1] ? 1 : 0, ma_dir_len) == ma_dir_len : true
+
+// Filter #2 - lt trend
+// V68.0 PHASE 3: Anti-repainting protection
+// V68.6: Ajout du multiplier configurable
+lt_trend_filter_long = lt_trend_filter ? request.security(syminfo.tickerid, lt_trend_filter_tf, pmax_htf_filter(lt_trend_filter_length, lt_trend_filter_mav, lt_trend_filter_mult), lookahead=barmerge.lookahead_off) : true
+lt_trend_filter_short = lt_trend_filter ? not lt_trend_filter_long : true
+
+// Filter 3 - mt trend
+// V68.0 PHASE 3: Anti-repainting protection
+// V68.6: Ajout du multiplier configurable
+mt_trend_filter_long = mt_trend_filter ? request.security(syminfo.tickerid, mt_trend_filter_tf, pmax_htf_filter(mt_trend_filter_length, mt_trend_filter_mav, mt_trend_filter_mult), lookahead=barmerge.lookahead_off) : true
+mt_trend_filter_short = mt_trend_filter ? not mt_trend_filter_long : true
+
+// Filter #4 - QQ Filters
+SSF = 5
+
+RSII = ta.ema(ta.rsi(close, qq_estimation_filter_length), SSF)
+
+QQE = ta.ema(RSII, SSF)
+
+QQE1 = ta.ema(RSII[1], SSF)
+
+QQE2 = ta.ema(RSII[2], SSF)
+
+delta_QQE = QQE - QQE1
+
+delta_QQE1 = QQE1 - QQE2
+
+cross_QQE = delta_QQE * delta_QQE1
+
+cross_QQE2 = RSII - QQE
+
+qq_filter_long = qq_estimation_filter ? cross_QQE[1] < 0 and cross_QQE > 0 and cross_QQE2 > 0 : true
+qq_filter_short = qq_estimation_filter ? cross_QQE[1] < 0 and cross_QQE > 0 and cross_QQE2 < 0 : true
+
+// Filter #5 - mavg
+mavg_filter_long = mavg_filter ? dir == 1 : true
+mavg_filter_short = mavg_filter ? dir == -1 : true
+
+// Filter #6 - Diff between moving average and redline
+diff_ma_red_long = 0.0
+diff_ma_red_short = 0.0
+
+diff_ma_red_long := MAvg - PMax
+diff_ma_red_short := PMax - MAvg
+
+// V68.5 BUG FIX: Distance MAXIMUM (pas minimum) - <= au lieu de >=
+diff_ma_red_filter_long = diff_ma_red_filter ? math.abs(diff_ma_red_long) / close <= diff_ma_red_filter_percentage : true
+diff_ma_red_filter_short = diff_ma_red_filter ? math.abs(diff_ma_red_short) / close <= diff_ma_red_filter_percentage : true
+
+// Filter #7 - Diff between price and redline
+diff_ma_price_long = 0.0
+diff_ma_price_short = 0.0
+
+diff_ma_price_long := close - PMax
+diff_ma_price_short := PMax - close
+
+// V68.5 BUG FIX: Distance MAXIMUM (pas minimum) - <= au lieu de >=
+diff_ma_price_filter_long = diff_ma_price_filter ? math.abs(diff_ma_price_long) / close <= diff_ma_price_filter_percentage : true
+diff_ma_price_filter_short = diff_ma_price_filter ? math.abs(diff_ma_price_short) / close <= diff_ma_price_filter_percentage : true
+
+// Filter #8 - snab - rsi > 50 
+rsi_close = ta.rsi(close, snab_rsi_len)
+snab_rsi50_filter_long = snab_rsi_50_Filter ? rsi_close > 50 : true
+snab_rsi50_filter_short = snab_rsi_50_Filter ? rsi_close < 50 : true
+
+// Filter #9 - snab - ema rsi 
+ema_rsi_close = ta.ema(rsi_close, snab_rsi_ema_len)
+
+snab_ema_filter_long = snab_rsi_ema_filter ? rsi_close > ema_rsi_close : true
+snab_ema_filter_short = snab_rsi_ema_filter ? rsi_close < ema_rsi_close : true
+
+// ============================================
+// V69.1: ADX REGIME FILTER CALCULATION (avant filter_all)
+// Doit être calculé ici pour être inclus dans filter_all_long/short
+// ============================================
+[diplus_calc, diminus_calc, adx_value_calc] = ta.dmi(adx_hint_length, adx_hint_length)
+strategy_hint_calc = adx_value_calc > adx_trend_threshold ? "TREND" : adx_value_calc < adx_reversion_threshold ? "REVERSION" : "MIXED"
+
+// Entry Types par catégorie
+// V69.2: MM Cross ajouté en catégorie TREND (signal tendanciel)
+is_trend_entry_type = entry_type == "Donc+Chikou" or entry_type == "Fractal" or entry_type == "ORB" or entry_type == "MM Cross"
+is_reversion_entry_type = entry_type == "VWAP" or entry_type == "Boll+SMA"
+is_polyvalent_entry_type = entry_type == "RSI Divergence"
+
+// Logique: TREND bloque REVERSION entries, REVERSION bloque TREND entries, MIXED autorise tout
+adx_regime_ok = use_adx_regime_filter ? (strategy_hint_calc == "TREND" ? (is_trend_entry_type or is_polyvalent_entry_type) : strategy_hint_calc == "REVERSION" ? (is_reversion_entry_type or is_polyvalent_entry_type) : true) : true
+
+adx_regime_filter_long = adx_regime_ok
+adx_regime_filter_short = adx_regime_ok
+
+// ===== COMBINE ALL FILTERS INCLUDING V67.0 + V69.1 =====
+// V69.1: Architecture des Security Layers:
+//   Layer 0: VIX (vix_filter_long/short) - External volatility
+//   Layer 1: Volatility (vol_filter_long/short) - ATR percentile
+//   Layer 2: Correlation (corr_filter_long/short)
+//   Layer 3: Max Hold Days (exit only, pas de filtre d'entrée)
+//   Layer 4: MTF Momentum (mtf_momentum_long/short)
+//   Layer 5: Gap Protection (gap_filter_long/short)
+//   ADX Regime Filter (adx_regime_filter_long/short) - Entry type compatibility
+// SUPPRIMÉS: regime_filter (redondant Layer 1), time_exit (redondant Max Hold Days)
+filter_all_long = ma_dir_filtter_long and lt_trend_filter_long and mt_trend_filter_long and qq_filter_long and mavg_filter_long and diff_ma_red_filter_long and diff_ma_price_filter_long and snab_rsi50_filter_long and snab_ema_filter_long and wma_sma_filter_long and macro_filter_long and vix_filter_long and vol_filter_long and corr_filter_long and mtf_momentum_long and gap_filter_long and adx_regime_filter_long
+
+filter_all_short = ma_dir_filtter_short and lt_trend_filter_short and mt_trend_filter_short and qq_filter_short and mavg_filter_short and diff_ma_red_filter_short and diff_ma_price_filter_short and snab_rsi50_filter_short and snab_ema_filter_short and wma_sma_filter_short and macro_filter_short and vix_filter_short and vol_filter_short and corr_filter_short and mtf_momentum_short and gap_filter_short and adx_regime_filter_short
+
+//}
+
+///////////////
+// SRATEGIES /{
+
+buy_alert_msg = ''
+sell_alert_msg = ''
+
+buy_trigger = MAvg > PMax
+sell_trigger = MAvg < PMax
+
+// V68.7: Delta supprimé, VWAP entry au market
+buy_limit_price = entry_type == 'Boll+SMA' and close > sma_50 ? sma_50 : entry_type == 'VWAP' ? vwap_lower : 0
+
+sell_limit_price = entry_type == 'Boll+SMA' and close < sma_50 ? sma_50 : entry_type == 'VWAP' ? vwap_upper : 0
+
+buy_stop_price = entry_type == 'Fractal' ? frac_high_level : entry_type == 'ORB' ? orbHighPrice : entry_type == 'Boll+SMA' and close < sma_50 ? sma_50 : 0
+
+sell_stop_price = entry_type == 'Fractal' ? frac_low_level : entry_type == 'ORB' ? orbLowPrice : entry_type == 'Boll+SMA' and close > sma_50 ? sma_50 : 0
+
+
+long_entry = strategy.position_size - strategy.position_size[1] > 0 and strategy.position_size[1] >= 0
+short_entry = strategy.position_size - strategy.position_size[1] < 0 and strategy.position_size[1] <= 0
+
+bars_from_last_long = 0
+bars_from_last_long := long_entry ? 0 : nz(bars_from_last_long[1]) + 1
+
+bars_from_last_short = 0
+bars_from_last_short := short_entry ? 0 : nz(bars_from_last_short[1]) + 1
+
+// V68.9: RSI Divergence ajouté
+// V69.2: MM Cross ajouté
+entry_long = entry_type == 'Fractal' and buy_fractal and not fractal_high_order_created[1] and bars_from_last_long >= order_pause or entry_type == 'Boll+SMA' and buy_boll_ma and bars_from_last_long >= order_pause or entry_type == 'VWAP' and buy_vwap_entry and bars_from_last_long >= order_pause or entry_type == 'ORB' and orb_formed and close < orbHighPrice and bars_from_last_long >= order_pause or entry_type == 'Donc+Chikou' and don_long and bars_from_last_long >= order_pause or entry_type == 'RSI Divergence' and buy_rsi_div and bars_from_last_long >= order_pause or entry_type == 'MM Cross' and buy_mm_cross and bars_from_last_long >= order_pause
+
+entry_short = entry_type == 'Fractal' and sell_fractal and not fractal_low_order_created[1] and bars_from_last_short >= order_pause or entry_type == 'Boll+SMA' and sell_boll_ma and bars_from_last_short >= order_pause or entry_type == 'VWAP' and sell_vwap_entry and bars_from_last_short >= order_pause or entry_type == 'ORB' and orb_formed and close > orbLowPrice and bars_from_last_short >= order_pause or entry_type == 'Donc+Chikou' and don_short and bars_from_last_short >= order_pause or entry_type == 'RSI Divergence' and sell_rsi_div and bars_from_last_short >= order_pause or entry_type == 'MM Cross' and sell_mm_cross and bars_from_last_short >= order_pause
+
+// V68.9: RSI Divergence ajouté aux conditions de cancel
+// V69.2: MM Cross ajouté aux conditions de cancel
+cancel_entry_long = entry_type == 'Boll+SMA' and not buy_boll_ma or entry_type == 'Fractal' and not buy_fractal or entry_type == 'VWAP' and not buy_vwap_entry or entry_type == 'RSI Divergence' and not buy_rsi_div or entry_type == 'MM Cross' and not mm_cross_long_state or allowed_between_signals_cancel
+
+cancel_entry_short = entry_type == 'Boll+SMA' and not sell_boll_ma or entry_type == 'Fractal' and not sell_fractal or entry_type == 'VWAP' and not sell_vwap_entry or entry_type == 'RSI Divergence' and not sell_rsi_div or entry_type == 'MM Cross' and not mm_cross_short_state or allowed_between_signals_cancel
+
+final_entry_long = entry_long and entry_allowed and filter_all_long and buy_trigger and barstate.isconfirmed
+final_entry_short = entry_short and entry_allowed and filter_all_short and sell_trigger and barstate.isconfirmed
+
+exit_reverse_setup_long = exit_at_reverse_setup and sellSignallk
+exit_reverse_setup_short = exit_at_reverse_setup and buySignalk
+
+close_long = exit_reverse_setup_long
+close_short = exit_reverse_setup_short
+
+current_pos = strategy.position_size > 0 ? 1 : strategy.position_size < 0 ? -1 : 0
+
+// Entry Price Placeholder until Strategy.position_avg_price is not available
+// V68.9: RSI Divergence ajouté
+buy_entry_price_placeholder = entry_type == 'Fractal' ? frac_high_level : entry_type == 'ORB' ? orbHighPrice : entry_type == 'Boll+SMA' ? math.max(buy_limit_price, buy_stop_price) : entry_type == 'VWAP' ? close : entry_type == 'RSI Divergence' ? close : close
+
+sell_entry_price_placeholder = entry_type == 'Fractal' ? frac_low_level : entry_type == 'ORB' ? orbLowPrice : entry_type == 'Boll+SMA' ? math.max(sell_limit_price, sell_stop_price) : entry_type == 'VWAP' ? close : entry_type == 'RSI Divergence' ? close : close
+
+entry_price = 0.0
+entry_price := current_pos != 0 ? strategy.position_avg_price : buy_trigger ? buy_entry_price_placeholder : sell_entry_price_placeholder
+
+bars_in_pos = 0
+bars_in_pos := strategy.position_size > 0 and strategy.position_size[1] <= 0 or strategy.position_size < 0 and strategy.position_size[1] >= 0 ? 1 : strategy.position_size != 0 ? nz(bars_in_pos[1]) + 1 : 0
+
+// === ATR-BASED STOP LOSS CALCULATION ===
+// V68.2: Utilise atr_14_global (centralisé)
+// V69: Dynamic SL Multiplier basé sur ratio volatilité
+atr_sl_safe = atr_14_global > 0 ? atr_14_global : 1.0  // Fallback minimal si ATR invalide
+
+// V69 FEATURE #1: DYNAMIC SL MULTIPLIER
+// Calcul du ratio de volatilité (court terme vs long terme)
+atr_50_global = ta.atr(50)
+vol_ratio = (atr_50_global != 0 and not na(atr_50_global)) ? atr_14_global / atr_50_global : 1.0
+
+// Multiplicateur dynamique ajusté selon la volatilité
+// vol_ratio > 1.2 → marché volatile → élargir SL (jusqu'à +50%)
+// vol_ratio < 0.8 → marché calme → resserrer SL (jusqu'à -20%)
+vol_adjustment = sl_dynamic_adjust ? math.min(math.max(vol_ratio, sl_vol_min_mult), sl_vol_max_mult) : 1.0
+dynamic_sl_mult_final = atr_sl_mult * vol_adjustment
+
+// Long SL basé sur ATR (avec multiplicateur dynamique V69)
+long_sl_atr = entry_price - (atr_sl_safe * dynamic_sl_mult_final)
+
+// Short SL basé sur ATR (avec multiplicateur dynamique V69)
+short_sl_atr = entry_price + (atr_sl_safe * dynamic_sl_mult_final)
+
+// === STOP LOSS SELECTION (4 MODES) ===
+long_sl = sl_mode == 'Static - %' ? entry_price * (1 - sl_percent / 100) :
+          sl_mode == 'Red Line' ? PMax :
+          sl_mode == 'ATR-Based' ? long_sl_atr :
+          0  // No SL
+
+short_sl = sl_mode == 'Static - %' ? entry_price * (1 + sl_percent / 100) :
+           sl_mode == 'Red Line' ? PMax :
+           sl_mode == 'ATR-Based' ? short_sl_atr :
+           0  // No SL
+
+dist_to_sl_long = entry_price - long_sl
+dist_to_sl_short = short_sl - entry_price
+
+new_long_entry = final_entry_long or current_pos != 0 and current_pos != current_pos[1]
+new_long_short = final_entry_short or current_pos != 0 and current_pos != current_pos[1]
+
+long_pt = 0.0
+long_pt := pt_mode == 'Static - Red Line %' and new_long_entry ? close + (close - PMax) * pt_rl_percent / 100 : pt_mode == 'Static - %' and new_long_entry ? entry_price * (1 + pt_percent / 100) : pt_mode == 'SL Ratio' and new_long_entry ? entry_price + dist_to_sl_long * pt_rr_ratio : nz(long_pt[1])
+
+short_pt = 0.0
+short_pt := pt_mode == 'Static - Red Line %' and new_long_short ? close - (PMax - close) * pt_rl_percent / 100 : pt_mode == 'Static - %' and new_long_short ? entry_price * (1 - pt_percent / 100) : pt_mode == 'SL Ratio' and new_long_short ? entry_price - dist_to_sl_short * pt_rr_ratio : nz(short_pt[1])
+
+long_be = 0.0
+long_be := pt_mode != 'No' and be_mode != 'No' ? entry_price + (long_pt - entry_price) * be_percent / 100 : nz(long_be[1])
+
+short_be = 0.0
+short_be := pt_mode != 'No' and be_mode != 'No' ? entry_price - (entry_price - short_pt) * be_percent / 100 : nz(short_be[1])
+
+long_be_triggered = false
+long_be_triggered := pt_mode == 'No' ? false : current_pos != 1 ? false : current_pos == 1 and high > long_be ? true : long_be_triggered[1]
+
+short_be_triggered = false
+short_be_triggered := pt_mode == 'No' ? false : current_pos != -1 ? false : current_pos == -1 and low < short_be ? true : short_be_triggered[1]
+
+if long_be_triggered and be_mode != 'No'
+    long_sl := entry_price
+    long_sl
+
+if short_be_triggered and be_mode != 'No'
+    short_sl := entry_price
+    short_sl
+
+long_tsl = 0.0
+short_tsl = 0.0
+
+long_tsl := long_be_triggered and not long_be_triggered[1] ? entry_price : tsl_frac_low > long_tsl[1] ? tsl_frac_low : nz(long_tsl[1])
+
+short_tsl := short_be_triggered and not short_be_triggered[1] ? entry_price : tsl_frac_high < short_tsl[1] ? tsl_frac_high : nz(short_tsl[1])
+
+// V67.0 - Dynamic TSL based on ATR
+// V68.2: Utilise atr_14_global (centralisé)
+atr_tsl = atr_14_global * tsl_atr_mult
+
+long_tsl_dynamic = 0.0
+short_tsl_dynamic = 0.0
+
+if dynamic_tsl and strategy.position_size > 0
+    long_tsl_dynamic := math.max(nz(long_tsl_dynamic[1]), close - atr_tsl)
+
+if dynamic_tsl and strategy.position_size < 0
+    short_tsl_dynamic := nz(short_tsl_dynamic[1]) == 0 ? close + atr_tsl : math.min(nz(short_tsl_dynamic[1]), close + atr_tsl)
+
+if long_be_triggered and be_mode == 'BE + TP + TSL'
+    long_sl := dynamic_tsl ? long_tsl_dynamic : long_tsl
+    long_sl
+
+if short_be_triggered and be_mode == 'BE + TP + TSL'
+    short_sl := dynamic_tsl ? short_tsl_dynamic : short_tsl
+    short_sl
+
+long_sl2 = 0.0
+short_sl2 = 0.0
+
+if be_mode == 'BE + TPx2 + TSL' and long_be_triggered
+    long_sl2 := dynamic_tsl ? long_tsl_dynamic : long_tsl
+    long_sl2
+
+if be_mode == 'BE + TPx2 + TSL' and short_be_triggered
+    short_sl2 := dynamic_tsl ? short_tsl_dynamic : short_tsl
+    short_sl2
+
+// V69.1: Time Exit SUPPRIMÉ (redondant avec Max Hold Days)
+// Le calcul current_profit_pct est conservé pour Max Hold Days
+current_profit_pct = strategy.position_size > 0 ? ((close - entry_price) / entry_price) * 100 : strategy.position_size < 0 ? ((entry_price - close) / entry_price) * 100 : 0
+
+// ============================================
+// V68.7.1 - Layer 3b: Max Hold Days (basé sur les JOURS CALENDAIRES)
+// Calcul indépendant du timeframe - utilise le timestamp réel
+// ============================================
+
+// Timestamp de l'entrée en position (persistant)
+var int entry_timestamp = na
+
+// Mettre à jour le timestamp à chaque nouvelle entrée
+if strategy.position_size != 0 and strategy.position_size[1] == 0
+    // Nouvelle position ouverte
+    entry_timestamp := time
+else if strategy.position_size == 0
+    // Position fermée - reset
+    entry_timestamp := na
+
+// Calcul de la durée de détention en jours
+// 86400000 = millisecondes par jour (24 * 60 * 60 * 1000)
+ms_per_day = 86400000
+days_in_position = na(entry_timestamp) ? 0.0 : (time - entry_timestamp) / ms_per_day
+
+// Condition de sortie basée sur les jours
+// Si profit_exception est ON et position en profit suffisant → ne pas fermer
+days_exceeded = days_in_position >= max_hold_days
+profit_exception_met = max_hold_days_profit_exception and current_profit_pct >= max_hold_days_profit_pct
+
+// Sortie si : filtre actif ET jours dépassés ET (pas d'exception profit OU exception non remplie)
+max_days_exit_long = max_hold_days_filter and days_exceeded and not profit_exception_met and strategy.position_size > 0
+max_days_exit_short = max_hold_days_filter and days_exceeded and not profit_exception_met and strategy.position_size < 0
+
+plot(entry_price, title = 'Entry Price', style = plot.style_linebr, color = color.new(color.blue, 60))
+
+plot(current_pos == 1 and long_sl != 0 ? long_sl : current_pos == -1 and short_sl != 0 ? short_sl : na, title = 'SL', style = plot.style_linebr, color = color.new(color.red, 50))
+
+plot(current_pos == 1 and long_pt != 0 ? long_pt : current_pos == -1 and short_pt != 0 ? short_pt : na, title = 'PT', style = plot.style_linebr, color = color.new(color.green, 50))
+
+plot(current_pos == 1 and long_be != 0 and long_pt != 0 ? long_be : current_pos == -1 and short_be != 0 and short_pt != 0 ? short_be : na, title = 'BE', style = plot.style_linebr, color = color.new(color.gray, 50))
+
+plot(current_pos == 1 and long_sl2 != 0 ? long_sl2 : current_pos == -1 and short_sl2 != 0 ? short_sl2 : na, title = 'SL2', style = plot.style_linebr, color = color.new(#FF00FF, 50))
+
+plot(tsl_show ? current_pos == 1 ? tsl_frac_low : current_pos == -1 ? tsl_frac_high : na : na, title = 'TSL Fractals', style = plot.style_linebr, color = color.new(color.maroon, 50))
+
+// V67.0 - Dynamic TSL Plot
+plot(dynamic_tsl and tsl_show ? current_pos == 1 ? long_tsl_dynamic : current_pos == -1 ? short_tsl_dynamic : na : na, title = 'Dynamic TSL', style = plot.style_linebr, color = color.new(color.orange, 50))
+
+////////////
+// ALERTS /{
+
+if pt_mode == 'No'
+    if sl_mode != 'No'
+        buy_alert_msg := LicenseID + ',buy,' + symbol_pc + (send_sl ? ',sl=' + str.tostring(math.round_to_mintick(long_sl)) : '') + ',risk=' + str.tostring(risk_lot_size_pc)
+        buy_alert_msg
+else
+    if sl_mode != 'No'
+        buy_alert_msg := LicenseID + ',buy,' + symbol_pc + (send_sl ? ',sl=' + str.tostring(math.round_to_mintick(long_sl)) : '') + (send_pt ? ',tp=' + str.tostring(math.round_to_mintick(long_pt)) : '') + ',risk=' + str.tostring(risk_lot_size_pc)
+        buy_alert_msg
+    else
+        buy_alert_msg := LicenseID + ',buy,' + symbol_pc + (send_pt ? ',tp=' + str.tostring(math.round_to_mintick(long_pt)) : '') + ',risk=' + str.tostring(risk_lot_size_pc)
+        buy_alert_msg
+
+buy_close_alert_msg = LicenseID + ',closelong,' + symbol_pc
+buy_close_pct_alert_msg = LicenseID + ',closelongpct,' + symbol_pc
+
+if pt_mode == 'No'
+    if sl_mode != 'No'
+        sell_alert_msg := LicenseID + ',sell,' + symbol_pc + (send_sl ? ',sl=' + str.tostring(math.round_to_mintick(short_sl)) : '') + ',risk=' + str.tostring(risk_lot_size_pc)
+        sell_alert_msg
+else
+    if sl_mode != 'No'
+        sell_alert_msg := LicenseID + ',sell,' + symbol_pc + (send_sl ? ',sl=' + str.tostring(math.round_to_mintick(short_sl)) : '') + (send_pt ? ',tp=' + str.tostring(math.round_to_mintick(short_pt)) : '') + ',risk=' + str.tostring(risk_lot_size_pc)
+        sell_alert_msg
+    else
+        sell_alert_msg := LicenseID + ',sell,' + symbol_pc + (send_pt ? ',tp=' + str.tostring(math.round_to_mintick(short_pt)) : '') + ',risk=' + str.tostring(risk_lot_size_pc)
+        sell_alert_msg
+
+sell_close_alert_msg = LicenseID + ',closeshort,' + symbol_pc
+sell_close_pct_alert_msg = LicenseID + ',closeshortpct,' + symbol_pc
+all_close_allert_msg = LicenseID + ',closelongshort,' + symbol_pc
+
+//}
+
+if cancel_entry_short
+    strategy.cancel('Short')
+
+// V69.1: Time Exit supprimé, Max Hold Days devient le seul exit temporel
+if close_long or max_days_exit_long
+    exit_comment = max_days_exit_long ? 'Max Days (' + str.tostring(max_hold_days) + 'd)' : 'Setup Reversal'
+    strategy.close(id = 'Long', alert_message = buy_close_alert_msg, comment = exit_comment)
+    strategy.cancel('Long')
+
+if close_short or max_days_exit_short
+    exit_comment = max_days_exit_short ? 'Max Days (' + str.tostring(max_hold_days) + 'd)' : 'Setup Reversal'
+    strategy.close(id = 'Short', alert_message = sell_close_alert_msg, comment = exit_comment)
+    strategy.cancel('Short')
+
+if bars_in_loss_enable
+    if bars_in_pos > bars_in_loss and strategy.openprofit < 0
+        strategy.close_all(alert_message = all_close_allert_msg)
+
+// V67.0 - Partial Profit Taking
+if partial_tp and strategy.position_size > 0
+    tp1_price = entry_price * (1 + tp1_pct / 100)
+    tp2_price = entry_price * (1 + tp2_pct / 100)
+    
+    strategy.exit('TP1 Long', 'Long', qty_percent=tp1_size, limit=tp1_price, comment='TP1')
+    strategy.exit('TP2 Long', 'Long', qty_percent=tp2_size, limit=tp2_price, comment='TP2')
+
+if partial_tp and strategy.position_size < 0
+    tp1_price = entry_price * (1 - tp1_pct / 100)
+    tp2_price = entry_price * (1 - tp2_pct / 100)
+    
+    strategy.exit('TP1 Short', 'Short', qty_percent=tp1_size, limit=tp1_price, comment='TP1')
+    strategy.exit('TP2 Short', 'Short', qty_percent=tp2_size, limit=tp2_price, comment='TP2')
+
+if current_pos == 1
+
+    exit_perc = 100
+
+    if long_sl2 != 0
+        strategy.exit('Long SL/PT2', 'Long', qty_percent = 50, stop = long_sl2, limit = long_pt, alert_message = buy_close_pct_alert_msg)
+        exit_perc := 50
+        exit_perc
+
+    if pt_mode == 'No'
+        if sl_mode != 'No'
+            strategy.exit('Long SL/PT', 'Long', qty_percent = exit_perc, stop = long_sl, alert_message = buy_close_alert_msg)
+    else
+        if sl_mode != 'No'
+            strategy.exit('Long SL/PT', 'Long', qty_percent = exit_perc, stop = long_sl, limit = long_pt, alert_message = buy_close_alert_msg)
+        else
+            strategy.exit('Long SL/PT', 'Long', qty_percent = exit_perc, limit = long_pt, alert_message = buy_close_alert_msg)
+
+
+else
+    strategy.cancel('Long SL/PT')
+    strategy.cancel('Long SL/PT2')
+
+
+if current_pos == -1
+
+    exit_perc = 100
+    if short_sl2 != 0
+        strategy.exit('Short SL/PT 2', 'Short', qty_percent = 50, stop = short_sl2, limit = short_pt, alert_message = sell_close_pct_alert_msg)
+        exit_perc := 50
+        exit_perc
+
+    if pt_mode == 'No'
+        if sl_mode != 'No'
+            strategy.exit('Short SL/PT', 'Short', qty_percent = exit_perc, stop = short_sl, alert_message = sell_close_alert_msg)
+    else
+        if sl_mode != 'No'
+            strategy.exit('Short SL/PT', 'Short', qty_percent = exit_perc, stop = short_sl, limit = short_pt, alert_message = sell_close_alert_msg)
+        else
+            strategy.exit('Short SL/PT', 'Short', qty_percent = exit_perc, limit = short_pt, alert_message = sell_close_alert_msg)
+else
+    strategy.cancel('Short SL/PT')
+    strategy.cancel('Short SL/PT 2')
+
+if final_entry_long
+    strategy.close(id = 'Short', alert_message = sell_close_alert_msg)
+    if long_side
+        strategy.cancel_all()
+
+        if buy_limit_price != 0
+            strategy.entry('Long', strategy.long, limit = buy_limit_price, alert_message = buy_alert_msg)
+        else if buy_stop_price != 0
+            strategy.entry('Long', strategy.long, stop = buy_stop_price, alert_message = buy_alert_msg)
+        else
+            strategy.entry('Long', strategy.long, alert_message = buy_alert_msg)
+
+if cancel_entry_long
+    strategy.cancel('Long')
+
+if final_entry_short
+    strategy.close(id = 'Long', alert_message = buy_close_alert_msg)
+    if short_side
+        strategy.cancel_all()
+        if sell_limit_price != 0
+            strategy.entry('Short', strategy.short, limit = sell_limit_price, alert_message = sell_alert_msg)
+        else if sell_stop_price != 0
+            strategy.entry('Short', strategy.short, stop = sell_stop_price, alert_message = sell_alert_msg)
+        else
+            strategy.entry('Short', strategy.short, alert_message = sell_alert_msg)
+
+//}
+
+///////////
+// PLOTS /{
+
+// Tracé des niveaux Fibonacci
+plot1 = plot(not plot_zones ? na : lev_0,     title="Lev 0",     color=color.black)
+plot2 = plot(not plot_zones ? na : lev_0_236, title="Lev 0.236", color=color.red)
+plot3 = plot(not plot_zones ? na : lev_0_382, title="Lev 0.382", color=color.green)
+plot4 = plot(not plot_zones ? na : lev_0_50 , title="Lev 0.5",   color=color.lime)
+plot5 = plot(not plot_zones ? na : lev_0_618, title="Lev 0.618", color=color.blue)
+plot6 = plot(not plot_zones ? na : lev_0_764, title="Lev 0.764", color=color.rgb(51,153,255))
+plot7 = plot(not plot_zones ? na : lev_1,     title="Lev 1",     color=color.black)
+
+// Remplissage entre les niveaux avec opacité à 20% (80% de transparence)
+fill(plot1, plot2, color=color.new(color.red, fib_zone1 ? 80 : 95))
+fill(plot2, plot3, color=color.new(color.rgb(51,153,255), fib_zone2 ? 80 : 95))
+fill(plot3, plot4, color=color.new(color.lime, fib_zone3 ? 80 : 95))
+fill(plot4, plot5, color=color.new(color.lime, fib_zone4 ? 80 : 95))
+fill(plot5, plot6, color=color.new(color.rgb(51,153,255), fib_zone5 ? 80 : 95))
+fill(plot6, plot7, color=color.new(color.red, fib_zone6 ? 80 : 95))
+
+plot(MAvg, color = color.new(#0585E1, 0), linewidth = 2, title = 'Moving Avg Line')
+pALL = plot(PMax, color = color.new(color.red, 0), linewidth = 3, title = 'PMax')
+
+plotshape(buySignalk ? PMax * 0.995 : na, title = 'Buy', text = 'Buy', location = location.absolute, style = shape.labelup, size = size.tiny, color = color.new(color.green, 0), textcolor = color.new(color.white, 0), display = display.none)
+plotshape(sellSignallk ? PMax * 1.005 : na, title = 'Sell', text = 'Sell', location = location.absolute, style = shape.labeldown, size = size.tiny, color = color.new(color.red, 0), textcolor = color.new(color.white, 0), display = display.none)
+
+longFillColor = MAvg > PMax ? color.green : na
+shortFillColor = MAvg < PMax ? color.red : na
+
+// Plot the fractals as shapes on the chart.
+plotshape(entry_type == 'Fractal' ? dnFractal_def : false, style = shape.triangledown, location = location.belowbar, offset = -2, color = color.new(color.maroon, 0), size = size.small, display = display.none)
+plotshape(entry_type == 'Fractal' ? upFractal_def : false, style = shape.triangleup, location = location.abovebar, offset = -2, color = color.new(color.olive, 0), size = size.small, display = display.none)
+
+plot(entry_type == 'Fractal' and show_fractals ? frac_high_level : na, color = color.green, title = 'Fractal High Level')
+plot(entry_type == 'Fractal' and show_fractals ? frac_low_level : na, color = color.red, title = 'Fractal Low Level')
+
+// Boll+SMA
+plot(entry_type == 'Boll+SMA' ? basis_bb_ma : na, 'Basis', color = #ff0000, offset = 0, linewidth = 3)
+p1_bb_ma = plot(entry_type == 'Boll+SMA' ? upper_bb_ma : na, 'Upper', color = #2962FF, offset = 0)
+p2_bb_ma = plot(entry_type == 'Boll+SMA' ? lower_bb_ma : na, 'Lower', color = #2962FF, offset = 0)
+fill(p1_bb_ma, p2_bb_ma, title = 'Background', color = color.rgb(33, 150, 243, 95))
+
+plot(entry_type == 'Boll+SMA' ? sma_50 : na, 'SMA 50', color = #ffaa00, linewidth = 3)
+
+// VWAP + Bandes (V68.7)
+plot(entry_type == 'VWAP' and show_vwap ? vwap_value : na, 'VWAP', color = color.blue, linewidth = 2)
+p1_vwap = plot(entry_type == 'VWAP' and show_vwap ? vwap_upper : na, 'VWAP Upper', color = color.new(color.teal, 30), linewidth = 1)
+p2_vwap = plot(entry_type == 'VWAP' and show_vwap ? vwap_lower : na, 'VWAP Lower', color = color.new(color.teal, 30), linewidth = 1)
+fill(p1_vwap, p2_vwap, title = 'VWAP Bands', color = color.new(color.teal, 90))
+
+plot(entry_type == 'Donc+Chikou' ? don_upperBand : na, color = color.black, linewidth = 3, title = 'Donc Upper')
+plot(entry_type == 'Donc+Chikou' ? don_lowerBand : na, color = color.black, linewidth = 3, title = 'Donc Lower')
+plot(entry_type == 'Donc+Chikou' ? close : na, color = color.green, linewidth = 2, title = 'Chikou', offset = -25)
+
+// RSI Divergence Signals (V68.9)
+// Affichage des signaux de divergence sur le graphique
+plotshape(entry_type == 'RSI Divergence' and show_rsi_div and bullish_div_signal ? low : na,
+     title='Bullish Divergence', text='Bull Div', textcolor=color.white,
+     style=shape.labelup, location=location.belowbar, color=color.new(color.green, 0),
+     size=size.small, offset=-rsi_div_pivot_lookback)
+plotshape(entry_type == 'RSI Divergence' and show_rsi_div and bearish_div_signal ? high : na,
+     title='Bearish Divergence', text='Bear Div', textcolor=color.white,
+     style=shape.labeldown, location=location.abovebar, color=color.new(color.red, 0),
+     size=size.small, offset=-rsi_div_pivot_lookback)
+plotshape(entry_type == 'RSI Divergence' and show_rsi_div and hidden_bullish_div_signal ? low : na,
+     title='Hidden Bullish', text='H.Bull', textcolor=color.white,
+     style=shape.labelup, location=location.belowbar, color=color.new(color.teal, 0),
+     size=size.tiny, offset=-rsi_div_pivot_lookback)
+plotshape(entry_type == 'RSI Divergence' and show_rsi_div and hidden_bearish_div_signal ? high : na,
+     title='Hidden Bearish', text='H.Bear', textcolor=color.white,
+     style=shape.labeldown, location=location.abovebar, color=color.new(color.orange, 0),
+     size=size.tiny, offset=-rsi_div_pivot_lookback)
+
+// MM Cross Lines (V69.2)
+plot(entry_type == 'MM Cross' and show_mm_cross ? mm_cross_ma1 : na, 'MM1 (Fast)', color = color.new(#2962FF, 0), linewidth = 2)
+plot(entry_type == 'MM Cross' and show_mm_cross ? mm_cross_ma2 : na, 'MM2 (Slow)', color = color.new(#FF6D00, 0), linewidth = 2)
+// Signaux visuels de croisement
+plotshape(entry_type == 'MM Cross' and show_mm_cross and buy_mm_cross ? low : na,
+     title='MM Cross Long', text='MM↑', textcolor=color.white,
+     style=shape.labelup, location=location.belowbar, color=color.new(color.green, 0),
+     size=size.small)
+plotshape(entry_type == 'MM Cross' and show_mm_cross and sell_mm_cross ? high : na,
+     title='MM Cross Short', text='MM↓', textcolor=color.white,
+     style=shape.labeldown, location=location.abovebar, color=color.new(color.red, 0),
+     size=size.small)
+
+signal_desc = ''
+
+signal_desc := signal_desc + '=== P.F.ALGO V69.2 ===\n\n'
+
+signal_desc := signal_desc + 'Final Entry: ' + (final_entry_long ? 'Long 🟢' : final_entry_short ? 'Short 🔴' : 'Flat ◯') + '\n\n'
+
+signal_desc := signal_desc + 'Entry: ' + (entry_long ? 'Long 🟢' : entry_short ? 'Short 🔴' : 'Flat ◯') + '\n\n'
+
+signal_desc := signal_desc + 'Trigger: ' + (buy_trigger ? 'Long 🟢' : sell_trigger ? 'Short 🔴' : 'Flat ◯') + '\n\n'
+
+signal_desc := signal_desc + 'Entry Allowed: ' + (entry_allowed ? 'On 🟢' : 'Off 🔴') + '\n'
+signal_desc := signal_desc + '1) Session: ' + (allowed_session ? 'On 🟢' : 'Off 🔴') + '\n'
+signal_desc := signal_desc + '2) Bars Between Signals: ' + (allowed_between_signals ? 'On 🟢' : 'Off 🔴') + '\n'
+signal_desc := signal_desc + '3) Range: ' + (allowed_range ? 'On 🟢' : 'Off 🔴') + '\n'
+signal_desc := signal_desc + '4) ATR EMA: ' + (allowed_atr_ema ? 'On 🟢' : 'Off 🔴') + '\n\n'
+
+label_long_short(long, short) =>
+    long and short ? 'Long 🟢 / Short 🔴' : long ? 'Long 🟢' : short ? 'Short 🔴' : 'Flat ◯'
+
+signal_desc := signal_desc + 'Filter ALL: ' + label_long_short(filter_all_long, filter_all_short) + '\n'
+
+signal_desc := signal_desc + (ma_dir_filter ? 'Filter #1 (MA Dir): ' + label_long_short(ma_dir_filtter_long, ma_dir_filtter_short) + '\n' : '')
+signal_desc := signal_desc + (lt_trend_filter ? 'Filter #2 (LT Trend): ' + label_long_short(lt_trend_filter_long, lt_trend_filter_short) + '\n' : '')
+signal_desc := signal_desc + (mt_trend_filter ? 'Filter #3 (MT Trend): ' + label_long_short(mt_trend_filter_long, mt_trend_filter_short) + '\n' : '')
+signal_desc := signal_desc + (qq_estimation_filter ? 'Filter #4 (QQ Est): ' + label_long_short(qq_filter_long, qq_filter_short) + '\n' : '')
+signal_desc := signal_desc + (mavg_filter ? 'Filter #5 (MAvg): ' + label_long_short(mavg_filter_long, mavg_filter_short) + '\n' : '')
+signal_desc := signal_desc + (diff_ma_red_filter ? 'Filter #6 (Diff Ma/red): ' + label_long_short(diff_ma_red_filter_long, diff_ma_red_filter_short) + '\n' : '')
+signal_desc := signal_desc + (diff_ma_price_filter ? 'Filter #7 (Diff Pr/red): ' + label_long_short(diff_ma_price_filter_long, diff_ma_price_filter_short) + '\n' : '')
+signal_desc := signal_desc + (snab_rsi_50_Filter ? 'Filter #8 (Snab RSI50): ' + label_long_short(snab_rsi50_filter_long, snab_rsi50_filter_short) + '\n' : '')
+signal_desc := signal_desc + (snab_rsi_50_Filter ? 'Filter #9 (Snab EMA): ' + label_long_short(snab_ema_filter_long, snab_ema_filter_short) + '\n' : '')
+signal_desc := signal_desc + (wma_sma_filter ? 'Filter #10 (WMA SMA): ' + label_long_short(wma_sma_filter_long, wma_sma_filter_short) + '\n' : '')
+// V68.4 - Macro Environment Filters (RS + Climate séparés)
+signal_desc := signal_desc + (macro_filter ? 'Filter #11a (RS): ' + label_long_short(rs_condition_long, rs_condition_short) + ' (' + str.tostring(macro_rs, '#.#') + ')\n' : '')
+signal_desc := signal_desc + (macro_filter ? 'Filter #11b (Climate): ' + label_long_short(climate_condition_long, climate_condition_short) + ' (' + str.tostring(macro_climate, '#.#') + ')\n' : '')
+signal_desc := signal_desc + (macro_filter ? 'Filter #11c (Total): ' + label_long_short(macro_score_filter_long, macro_score_filter_short) + ' (' + str.tostring(macro, '#.#') + ') [' + macro_mode + ']\n' : '')
+// V69.1: VIX maintenant Security Layer 0 (affiché avant les autres)
+
+// Security Layers Display (V69.1 Architecture)
+signal_desc := signal_desc + (vix_filter ? 'Layer 0 (VIX): ' + label_long_short(vix_filter_long, vix_filter_short) + ' (' + str.tostring(vix_value, '#.#') + ')\n' : '')
+signal_desc := signal_desc + (vol_adaptive_filter ? 'Layer 1 (Volatility): ' + label_long_short(vol_filter_long, vol_filter_short) + '\n' : '')
+signal_desc := signal_desc + (correlation_filter ? 'Layer 2 (Correlation): ' + label_long_short(corr_filter_long, corr_filter_short) + '\n' : '')
+signal_desc := signal_desc + (max_hold_days_filter ? 'Layer 3 (Max Days): ' + str.tostring(max_hold_days) + 'd | In pos: ' + str.tostring(days_in_position, '#.#') + 'd' + (days_exceeded ? ' ⚠️' : ' ✅') + '\n' : '')
+signal_desc := signal_desc + (mtf_momentum_filter ? 'Layer 4 (MTF Momentum): ' + label_long_short(mtf_momentum_long, mtf_momentum_short) + '\n' : '')
+signal_desc := signal_desc + (gap_protection ? 'Layer 5 (Gap Protection): ' + label_long_short(gap_filter_long, gap_filter_short) + '\n' : '')
+// V69.1: ADX Regime Filter (Entry Type compatibility)
+signal_desc := signal_desc + (use_adx_regime_filter ? 'ADX Regime (' + strategy_hint_calc + '): ' + label_long_short(adx_regime_filter_long, adx_regime_filter_short) + ' | Entry: ' + entry_type + '\n' : '')
+// V69: Dynamic SL Info
+signal_desc := signal_desc + (sl_dynamic_adjust and sl_mode == 'ATR-Based' ? 'V69 Dynamic SL: Vol Ratio=' + str.tostring(vol_ratio, '#.##') + ' | Mult=' + str.tostring(dynamic_sl_mult_final, '#.##') + '\n' : '')
+
+plotshape(filter_all_long ? PMax : na, 'Signal', color = long_label_col, style = shape.circle, location = location.absolute)
+plotshape(filter_all_short ? PMax : na, 'Signal', color = short_label_col, style = shape.circle, location = location.absolute)
+plotshape(not filter_all_short and not filter_all_long ? PMax : na, 'Signal', color = flat_label_col, style = shape.circle, location = location.absolute)
+
+if show_filter_lbl
+    label.new(bar_index, PMax, tooltip = signal_desc, color = color.new(color.black, 100))
+
+plotshape(show_final_entries_labels ? final_entry_long : bool(na), 'Long Final', style = shape.arrowup, color = color.green, textcolor = color.green, location = location.abovebar, text = 'L')
+plotshape(show_final_entries_labels ? final_entry_short : bool(na), 'Short Final', style = shape.arrowdown, color = color.red, textcolor = color.red, location = location.belowbar, text = 'S')
+
+var box dailyBox = na
+
+if entry_type == 'ORB'
+    if first_bar
+        dailyBox := box.new(left = bar_index, top = orbHighPrice, right = bar_index + 1, bottom = orbLowPrice, bgcolor = color.new(color.teal, 80), border_color = color.teal, border_width = 2)
+
+        box.set_right(dailyBox[1], bar_index[1])
+
+    else
+        box.set_top(dailyBox, orbHighPrice)
+        box.set_rightbottom(dailyBox, right = bar_index + 1, bottom = orbLowPrice)
+
+// ===== V69.1: REGIME FILTER BACKGROUND SUPPRIMÉ =====
+// Raison: Security Layer 6 (Regime Filter) supprimé car redondant avec Layer 1
+
+// ===== V69.1 ADX REGIME FILTER + STRATEGY HINT TABLE =====
+// Note: Les calculs ADX sont faits plus haut (adx_value_calc, strategy_hint_calc, adx_regime_ok)
+// Ici on prépare juste l'affichage
+
+// Entry Types recommandés selon le régime (pour affichage)
+// V69.2: MM Cross ajouté aux recommandations TREND
+recommended_entries = strategy_hint_calc == "TREND" ? "Donc+Chikou, Fractal, ORB, MM Cross" : strategy_hint_calc == "REVERSION" ? "VWAP, Boll+SMA, RSI Div" : "RSI Divergence (polyvalent)"
+
+// Statut du filtre pour affichage
+adx_filter_status = use_adx_regime_filter ? (adx_regime_ok ? "✅ Compatible" : "❌ Bloqué") : "OFF"
+
+// Table Strategy Hint (coin haut gauche) - V69.1: Ajout du statut filtre
+if show_strategy_hint and barstate.islast
+    var table hint_table = table.new(position.top_left, 2, 5, bgcolor=color.new(color.gray, 80), border_width=1)
+    
+    hint_color = strategy_hint_calc == "TREND" ? color.new(color.green, 30) : strategy_hint_calc == "REVERSION" ? color.new(color.blue, 30) : color.new(color.orange, 30)
+    filter_status_color = use_adx_regime_filter ? (adx_regime_ok ? color.new(color.green, 30) : color.new(color.red, 30)) : color.new(color.gray, 50)
+    
+    table.cell(hint_table, 0, 0, "ADX Regime V69.1", text_color=color.white, bgcolor=color.new(color.purple, 50), text_size=size.small)
+    table.cell(hint_table, 1, 0, use_adx_regime_filter ? "FILTER ON" : "HINT ONLY", bgcolor=color.new(color.purple, 50), text_color=color.yellow, text_size=size.tiny)
+    table.cell(hint_table, 0, 1, "ADX (" + str.tostring(adx_hint_length) + ")", text_color=color.white, text_size=size.small)
+    table.cell(hint_table, 1, 1, str.tostring(adx_value_calc, "#.#"), text_color=color.white, text_size=size.small)
+    table.cell(hint_table, 0, 2, "Regime", text_color=color.white, text_size=size.small)
+    table.cell(hint_table, 1, 2, strategy_hint_calc, text_color=color.white, bgcolor=hint_color, text_size=size.normal)
+    table.cell(hint_table, 0, 3, "Entry Type", text_color=color.white, text_size=size.tiny)
+    table.cell(hint_table, 1, 3, entry_type, text_color=color.white, text_size=size.tiny)
+    table.cell(hint_table, 0, 4, "Status", text_color=color.white, text_size=size.small)
+    table.cell(hint_table, 1, 4, adx_filter_status, text_color=color.white, bgcolor=filter_status_color, text_size=size.small)
+
+// ===== V67.2 DEBUG MODE =====
+
+// V68.4: Plot Macro Scores séparés
+plot(debug_mode and debug_show_macro_score ? macro_rs : na, "💪 RS Score", color=color.new(color.teal, 0), linewidth=1, style=plot.style_line)
+plot(debug_mode and debug_show_macro_score ? macro_climate : na, "🌍 Climate Score", color=color.new(color.purple, 0), linewidth=1, style=plot.style_line)
+plot(debug_mode and debug_show_macro_score ? macro : na, "📊 Macro Total", color=color.new(color.blue, 0), linewidth=2, style=plot.style_line)
+hline(debug_mode and debug_show_macro_score ? 0 : na, "Zero Line", color=color.new(color.gray, 50), linestyle=hline.style_dotted)
+
+// Plot VIX value
+// V68.1: Réutilise vix_value déjà calculé (évite request.security dupliqué)
+plot(debug_mode and debug_show_macro_score and vix_filter ? vix_value : na, "📉 VIX", color=color.new(color.orange, 0), linewidth=1)
+
+// Helper functions for filter status (V67.2 - Must be defined outside if block)
+getStatusColor(status) =>
+    status ? color.new(color.green, 70) : color.new(color.red, 70)
+
+getStatusText(status) =>
+    status ? "✅" : "❌"
+
+// Create filter status table (if debug mode enabled)
+if debug_mode and debug_show_filters and barstate.islast
+    var table debug_table = table.new(position.top_right, 3, 20, border_width=2)
+    
+    // Header
+    table.cell(debug_table, 0, 0, "Filter", text_color=color.white, bgcolor=color.new(color.gray, 0), text_size=size.small)
+    table.cell(debug_table, 1, 0, "Long", text_color=color.white, bgcolor=color.new(color.gray, 0), text_size=size.small)
+    table.cell(debug_table, 2, 0, "Short", text_color=color.white, bgcolor=color.new(color.gray, 0), text_size=size.small)
+    
+    // Row counter
+    row = 1
+    
+    // V68.4 - Macro Environment Filters (RS + Climate séparés)
+    if macro_filter
+        // Ligne RS (Relative Strength)
+        table.cell(debug_table, 0, row, "💪 RS (" + str.tostring(macro_rs, "#.#") + ") [" + rs_tf + "]", text_size=size.small)
+        table.cell(debug_table, 1, row, getStatusText(rs_condition_long), bgcolor=getStatusColor(rs_condition_long), text_size=size.small)
+        table.cell(debug_table, 2, row, getStatusText(rs_condition_short), bgcolor=getStatusColor(rs_condition_short), text_size=size.small)
+        row := row + 1
+        
+        // Ligne Climate (Risk-On/Off)
+        table.cell(debug_table, 0, row, "🌍 Climate (" + str.tostring(macro_climate, "#.#") + ") [" + climate_tf + "]", text_size=size.small)
+        table.cell(debug_table, 1, row, getStatusText(climate_condition_long), bgcolor=getStatusColor(climate_condition_long), text_size=size.small)
+        table.cell(debug_table, 2, row, getStatusText(climate_condition_short), bgcolor=getStatusColor(climate_condition_short), text_size=size.small)
+        row := row + 1
+        
+        // Ligne Total avec Mode
+        table.cell(debug_table, 0, row, "📊 Total (" + str.tostring(macro, "#.#") + ") [" + macro_mode + "]", text_size=size.small)
+        table.cell(debug_table, 1, row, getStatusText(macro_score_filter_long), bgcolor=getStatusColor(macro_score_filter_long), text_size=size.small)
+        table.cell(debug_table, 2, row, getStatusText(macro_score_filter_short), bgcolor=getStatusColor(macro_score_filter_short), text_size=size.small)
+        row := row + 1
+    
+    if vix_filter
+        table.cell(debug_table, 0, row, "📉 VIX (" + str.tostring(vix_value, "#.#") + ")", text_size=size.small)
+        table.cell(debug_table, 1, row, getStatusText(vix_filter_long), bgcolor=getStatusColor(vix_filter_long), text_size=size.small)
+        table.cell(debug_table, 2, row, getStatusText(vix_filter_short), bgcolor=getStatusColor(vix_filter_short), text_size=size.small)
+        row := row + 1
+    
+    // Security Layers
+    if vol_adaptive_filter
+        table.cell(debug_table, 0, row, "🔒 Volatility", text_size=size.small)
+        table.cell(debug_table, 1, row, getStatusText(vol_filter_long), bgcolor=getStatusColor(vol_filter_long), text_size=size.small)
+        table.cell(debug_table, 2, row, getStatusText(vol_filter_short), bgcolor=getStatusColor(vol_filter_short), text_size=size.small)
+        row := row + 1
+    
+    if correlation_filter
+        table.cell(debug_table, 0, row, "🔗 Correlation", text_size=size.small)
+        table.cell(debug_table, 1, row, getStatusText(corr_filter_long), bgcolor=getStatusColor(corr_filter_long), text_size=size.small)
+        table.cell(debug_table, 2, row, getStatusText(corr_filter_short), bgcolor=getStatusColor(corr_filter_short), text_size=size.small)
+        row := row + 1
+    
+    if mtf_momentum_filter
+        table.cell(debug_table, 0, row, "⏱️ MTF Momentum (" + str.tostring(mtf_score_total) + ")", text_size=size.small)
+        table.cell(debug_table, 1, row, getStatusText(mtf_momentum_long), bgcolor=getStatusColor(mtf_momentum_long), text_size=size.small)
+        table.cell(debug_table, 2, row, getStatusText(mtf_momentum_short), bgcolor=getStatusColor(mtf_momentum_short), text_size=size.small)
+        row := row + 1
+    
+    if gap_protection
+        gap_size_current = math.abs((open - close[1]) / close[1]) * 100
+        table.cell(debug_table, 0, row, "🚫 Gap (" + str.tostring(gap_size_current, "#.##") + "%)", text_size=size.small)
+        table.cell(debug_table, 1, row, getStatusText(gap_filter_long), bgcolor=getStatusColor(gap_filter_long), text_size=size.small)
+        table.cell(debug_table, 2, row, getStatusText(gap_filter_short), bgcolor=getStatusColor(gap_filter_short), text_size=size.small)
+        row := row + 1
+    
+    // V69.1: ADX Regime Filter
+    if use_adx_regime_filter
+        adx_regime_icon = adx_regime_ok ? "✅" : "❌"
+        table.cell(debug_table, 0, row, "📊 ADX Regime (" + strategy_hint_calc + ") " + adx_regime_icon, text_size=size.small)
+        table.cell(debug_table, 1, row, getStatusText(adx_regime_filter_long), bgcolor=getStatusColor(adx_regime_filter_long), text_size=size.small)
+        table.cell(debug_table, 2, row, getStatusText(adx_regime_filter_short), bgcolor=getStatusColor(adx_regime_filter_short), text_size=size.small)
+        row := row + 1
+    
+    // V69: Dynamic SL Info
+    if sl_dynamic_adjust and sl_mode == 'ATR-Based'
+        table.cell(debug_table, 0, row, "🔄 Dyn SL V69 (×" + str.tostring(dynamic_sl_mult_final, "#.##") + ")", text_size=size.small, bgcolor=color.new(color.purple, 80))
+        table.cell(debug_table, 1, row, "Vol:" + str.tostring(vol_ratio, "#.##"), text_size=size.small, bgcolor=color.new(color.purple, 80))
+        table.cell(debug_table, 2, row, "-", text_size=size.small, bgcolor=color.new(color.purple, 80))
+        row := row + 1
+    
+    // Other filters summary
+    if ma_dir_filter or lt_trend_filter or mt_trend_filter or qq_estimation_filter or mavg_filter or diff_ma_red_filter or diff_ma_price_filter or snab_rsi_50_Filter or snab_rsi_ema_filter or wma_sma_filter
+        other_filters_count = (ma_dir_filter ? 1 : 0) + (lt_trend_filter ? 1 : 0) + (mt_trend_filter ? 1 : 0) + (qq_estimation_filter ? 1 : 0) + (mavg_filter ? 1 : 0) + (diff_ma_red_filter ? 1 : 0) + (diff_ma_price_filter ? 1 : 0) + (snab_rsi_50_Filter ? 1 : 0) + (snab_rsi_ema_filter ? 1 : 0) + (wma_sma_filter ? 1 : 0)
+        table.cell(debug_table, 0, row, "⚙️ Other Filters (" + str.tostring(other_filters_count) + ")", text_size=size.small, bgcolor=color.new(color.gray, 80))
+        table.cell(debug_table, 1, row, "-", text_size=size.small, bgcolor=color.new(color.gray, 80))
+        table.cell(debug_table, 2, row, "-", text_size=size.small, bgcolor=color.new(color.gray, 80))
+        row := row + 1
+    
+    // Final combined filter
+    table.cell(debug_table, 0, row, "🎯 FINAL", text_color=color.white, bgcolor=color.new(color.navy, 0), text_size=size.normal)
+    table.cell(debug_table, 1, row, getStatusText(filter_all_long), text_color=color.white, bgcolor=filter_all_long ? color.new(color.green, 0) : color.new(color.red, 0), text_size=size.normal)
+    table.cell(debug_table, 2, row, getStatusText(filter_all_short), text_color=color.white, bgcolor=filter_all_short ? color.new(color.green, 0) : color.new(color.red, 0), text_size=size.normal)
+
+//}

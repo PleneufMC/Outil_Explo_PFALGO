@@ -1,0 +1,935 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PF AI Lab 5.4.8 - Best Configs</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+    <style>
+        :root { --bg-dark: #0a1628; --bg-card: #0f2035; --bg-input: #162a42; --border: #1e3a5f; --text: #e8edf4; --text-muted: #8ba3be; --accent: #00C8C8; --accent-hover: #00B4D8; --navy: #004C8C; --green: #00D084; --red: #f85149; --orange: #f0a030; --purple: #bc8cff; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg-dark); color: var(--text); }
+        nav { background: var(--bg-card); border-bottom: 1px solid var(--border); padding: 0 2rem; display: flex; align-items: center; height: 60px; }
+        nav .logo { font-size: 1.3rem; font-weight: 700; color: #e8edf4; margin-right: 2rem; letter-spacing: 0.5px; }
+        nav .logo .brand { color: var(--accent); }
+        nav .logo span { color: var(--green); }
+        nav a { color: var(--text-muted); text-decoration: none; padding: 0.5rem 1rem; border-radius: 6px; margin: 0 0.2rem; font-size: 0.9rem; }
+        nav a:hover, nav a.active { color: var(--text); background: var(--bg-input); }
+        .container { max-width: 1600px; margin: 0 auto; padding: 2rem; }
+        h1 { font-size: 1.8rem; margin-bottom: 0.5rem; }
+        .subtitle { color: var(--text-muted); margin-bottom: 2rem; font-size: 0.9rem; }
+        .card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; margin-bottom: 1.5rem; }
+        input, select, button { background: var(--bg-input); border: 1px solid var(--border); color: var(--text); padding: 0.5rem 1rem; border-radius: 6px; font-size: 0.9rem; }
+        button { cursor: pointer; background: var(--accent); color: var(--bg-dark); font-weight: 600; border: none; padding: 0.7rem 1.5rem; transition: all 0.2s; }
+        button:hover { background: var(--accent-hover); box-shadow: 0 2px 12px rgba(0, 200, 200, 0.3); }
+        button.btn-sm { padding: 0.3rem 0.7rem; font-size: 0.78rem; }
+        button.btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text-muted); }
+        button.btn-outline:hover { border-color: var(--accent); color: var(--accent); background: transparent; }
+        button.btn-green { background: var(--green); }
+
+        /* Stats row */
+        .stats-row { display: flex; gap: 1.5rem; flex-wrap: wrap; margin-bottom: 1.5rem; }
+        .stat-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 1rem 1.5rem; min-width: 140px; }
+        .stat-card .value { font-size: 1.8rem; font-weight: 700; color: var(--accent); }
+        .stat-card .label { font-size: 0.8rem; color: var(--text-muted); margin-top: 0.2rem; }
+
+        /* Instrument summary cards */
+        .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.2rem; margin-bottom: 2rem; }
+        .summary-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: 1.2rem; cursor: pointer; transition: all 0.2s; }
+        .summary-card:hover { border-color: var(--accent); transform: translateY(-2px); box-shadow: 0 4px 20px rgba(0,200,200,0.1); }
+        .summary-card.active { border-color: var(--accent); background: rgba(0,200,200,0.05); }
+        .summary-card .inst-name { font-size: 1.2rem; font-weight: 700; margin-bottom: 0.6rem; display: flex; align-items: center; justify-content: space-between; }
+        .summary-card .inst-name .count { font-size: 0.8rem; font-weight: 500; color: var(--text-muted); }
+        .summary-mini { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; }
+        .summary-mini .item { text-align: center; }
+        .summary-mini .item .val { font-size: 1rem; font-weight: 700; }
+        .summary-mini .item .lbl { font-size: 0.7rem; color: var(--text-muted); }
+
+        /* Badge */
+        .badge { display: inline-block; padding: 0.15rem 0.4rem; border-radius: 4px; font-size: 0.7rem; font-weight: 600; }
+        .badge-A { background: rgba(0,208,132,0.2); color: #00D084; }
+        .badge-B { background: rgba(0,200,200,0.2); color: #00C8C8; }
+        .badge-C { background: rgba(240,160,48,0.2); color: #f0a030; }
+        .badge-D { background: rgba(248,81,73,0.2); color: #f85149; }
+        .badge-pass { background: rgba(0,208,132,0.15); color: var(--green); }
+        .badge-fail { background: rgba(248,81,73,0.15); color: var(--red); }
+        .badge-gold { background: rgba(255,215,0,0.15); color: #ffd700; }
+
+        /* Config table for detail */
+        table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+        th, td { padding: 0.5rem 0.6rem; text-align: left; border-bottom: 1px solid var(--border); white-space: nowrap; }
+        th { color: var(--text-muted); font-weight: 600; position: sticky; top: 0; background: var(--bg-card); z-index: 2; }
+        tr:hover { background: var(--bg-input); }
+
+        /* Filter bar */
+        .filter-bar { display: flex; gap: 1rem; align-items: end; flex-wrap: wrap; margin-bottom: 1rem; }
+        .filter-bar label { display: block; color: var(--text-muted); font-size: 0.8rem; margin-bottom: 0.3rem; }
+
+        /* Detail section */
+        #detail-section { display: none; }
+        #detail-section.active { display: block; }
+
+        /* Modal */
+        #modal { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.55); z-index: 1000; justify-content: center; align-items: center; }
+        #modal.active { display: flex; }
+        #modal-content { background: #ffffff; color: #131722; border-radius: 8px; padding: 0; max-width: 520px; width: 92%; max-height: 85vh; overflow-y: auto; position: relative; box-shadow: 0 8px 40px rgba(0,0,0,0.45); }
+        pre.tv-export { background: #f0f3fa; padding: 1rem; border-radius: 6px; font-size: 0.78rem; overflow-x: auto; white-space: pre-wrap; max-height: 300px; overflow-y: auto; color: #131722; }
+
+        /* TradingView-style modal header */
+        .tv-modal-header { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid #e0e3eb; }
+        .tv-modal-header h2 { font-size: 1rem; font-weight: 700; color: #131722; margin: 0; }
+        .tv-modal-close { background: none; border: none; color: #787b86; font-size: 1.4rem; cursor: pointer; padding: 4px 8px; border-radius: 4px; }
+        .tv-modal-close:hover { background: #f0f3fa; color: #131722; }
+
+        /* Tabs row (mimics TV Inputs/Properties/Style/Visibility) */
+        .tv-tabs { display: flex; border-bottom: 1px solid #e0e3eb; padding: 0 16px; }
+        .tv-tab { padding: 8px 12px; font-size: 0.82rem; font-weight: 600; color: #787b86; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+        .tv-tab.active { color: #2962ff; border-bottom-color: #2962ff; }
+
+        /* Config body */
+        .tv-config-body { padding: 8px 16px 16px; }
+
+        /* TradingView-style collapsible groups */
+        .tv-group { border-bottom: 1px solid #e0e3eb; }
+        .tv-group:last-child { border-bottom: none; }
+        .tv-group-header { display: flex; align-items: center; gap: 6px; padding: 10px 0; cursor: pointer; user-select: none; font-size: 0.72rem; font-weight: 600; color: #787b86; text-transform: uppercase; letter-spacing: 0.5px; }
+        .tv-group-header:hover { color: #131722; }
+        .tv-group-header .chevron { font-size: 0.55rem; transition: transform 0.2s; display: inline-block; }
+        .tv-group-header.collapsed .chevron { transform: rotate(-90deg); }
+        .tv-group-body { padding-bottom: 6px; }
+        .tv-group-body.collapsed { display: none; }
+
+        /* Parameter rows — mimics TV input layout */
+        .tv-row { display: flex; align-items: center; justify-content: space-between; padding: 4px 0 4px 8px; min-height: 28px; }
+        .tv-row:hover { background: #f8f9fd; border-radius: 4px; }
+        .tv-label { font-size: 0.82rem; color: #131722; flex: 1; }
+        .tv-value { font-size: 0.82rem; color: #131722; font-weight: 500; background: #f0f3fa; border: 1px solid #e0e3eb; border-radius: 4px; padding: 3px 10px; min-width: 60px; text-align: center; white-space: nowrap; }
+
+        /* Inline row (multiple params on one line, like TV) */
+        .tv-row-inline { display: flex; align-items: center; gap: 16px; padding: 4px 0 4px 8px; min-height: 28px; }
+        .tv-row-inline .tv-inline-pair { display: flex; align-items: center; gap: 6px; }
+        .tv-row-inline .tv-inline-pair .tv-label { font-size: 0.78rem; color: #787b86; flex: none; }
+
+        /* Checkbox rows */
+        .tv-row-check { display: flex; align-items: center; gap: 8px; padding: 4px 0 4px 8px; min-height: 28px; }
+        .tv-row-check:hover { background: #f8f9fd; border-radius: 4px; }
+        .tv-check-box { width: 16px; height: 16px; border-radius: 3px; display: inline-flex; align-items: center; justify-content: center; font-size: 0.65rem; font-weight: 700; flex-shrink: 0; }
+        .tv-check-box.on { background: #2962ff; color: #fff; }
+        .tv-check-box.off { background: #e0e3eb; color: transparent; }
+        .tv-check-label { font-size: 0.82rem; color: #131722; }
+
+        /* ON/OFF value badges */
+        .on { color: #2962ff; font-weight: 600; }
+        .off { color: #b2b5be; }
+
+        /* KPI summary bar */
+        .tv-kpi-bar { display: flex; gap: 8px; flex-wrap: wrap; padding: 8px 16px; border-bottom: 1px solid #e0e3eb; background: #f8f9fd; }
+        .tv-kpi { text-align: center; flex: 1; min-width: 60px; }
+        .tv-kpi .kval { font-size: 0.9rem; font-weight: 700; }
+        .tv-kpi .klbl { font-size: 0.62rem; color: #787b86; text-transform: uppercase; }
+
+        /* Footer buttons */
+        .tv-modal-footer { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 16px; border-top: 1px solid #e0e3eb; }
+        .tv-btn { padding: 6px 16px; border-radius: 4px; font-size: 0.82rem; font-weight: 600; cursor: pointer; border: 1px solid #e0e3eb; background: #fff; color: #131722; }
+        .tv-btn:hover { background: #f0f3fa; }
+        .tv-btn-primary { background: #2962ff; color: #fff; border-color: #2962ff; }
+        .tv-btn-primary:hover { background: #1e53e5; box-shadow: none; }
+
+        /* Timeframe tag */
+        .tf-tag { display: inline-block; padding: 0.1rem 0.35rem; border-radius: 3px; font-size: 0.7rem; font-weight: 600; background: rgba(0,200,200,0.1); color: var(--accent); margin-left: 0.2rem; }
+
+        /* Empty state */
+        .empty-state { text-align: center; padding: 3rem; color: var(--text-muted); }
+        .empty-state .icon { font-size: 3rem; margin-bottom: 1rem; }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .summary-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <nav>
+        <div class="logo"><span class="brand">PF AI Lab</span> <span>{{ app_version }}</span></div>
+        <a href="/">Home</a>
+        <a href="/data">1. Data</a>
+        <a href="/explore">2. Explore</a>
+        <a href="/test">3. Test</a>
+        <a href="/validate">4. Validate</a>
+        <a href="/portfolio">5. Portfolio</a>
+        <a href="/best" class="active">Best Configs</a>
+        <a href="/audit">Audit</a>
+        <a href="/database">DB</a>
+    </nav>
+
+    <div class="container">
+        <h1>Best Theoretical Configurations</h1>
+        <p class="subtitle">Top-ranked configurations per instrument from all optimization runs. Ranked by composite quality score balancing OOS performance + robustness. WFE >100% is penalized (OOS better than IS = likely luck). Hover Quality column for formula details.</p>
+
+        <!-- Stats cards -->
+        <div class="stats-row">
+            <div class="stat-card">
+                <div class="value" id="stat-instruments">{{ instruments_summary|length }}</div>
+                <div class="label">Instruments Explored</div>
+            </div>
+            <div class="stat-card">
+                <div class="value" id="stat-runs">{{ stats.total_runs }}</div>
+                <div class="label">Total Runs</div>
+            </div>
+            <div class="stat-card">
+                <div class="value" id="stat-configs">{{ stats.total_configs }}</div>
+                <div class="label">Total Configs</div>
+            </div>
+            <div class="stat-card">
+                <div class="value" style="color:var(--green);" id="stat-oos">{{ stats.oos_pass_count }}</div>
+                <div class="label">OOS Gate PASS</div>
+            </div>
+        </div>
+
+        <!-- Filter -->
+        <div class="card">
+            <div class="filter-bar">
+                <div>
+                    <label>Top N per instrument</label>
+                    <select id="filter-topn" onchange="loadBest()">
+                        <option value="3">Top 3</option>
+                        <option value="5" selected>Top 5</option>
+                        <option value="10">Top 10</option>
+                    </select>
+                </div>
+                <div>
+                    <label>Filter instrument</label>
+                    <select id="filter-instrument" onchange="loadBest()">
+                        <option value="">All instruments</option>
+                        {% for group, insts in instrument_groups.items() %}
+                        <optgroup label="{{ group }}">
+                            {% for inst in insts %}
+                            <option value="{{ inst }}">{{ inst }}</option>
+                            {% endfor %}
+                        </optgroup>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div style="display:flex; gap:0.5rem; align-items:end;">
+                    <button onclick="loadBest()">Refresh</button>
+                    <button class="btn-green" onclick="exportCsv()">Export CSV</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Instruments summary grid (clickable cards) -->
+        <div class="summary-grid" id="summary-grid">
+            <!-- Filled by JS -->
+        </div>
+
+        <!-- Detail table for selected instrument -->
+        <div id="detail-section" class="card" style="overflow-x:auto; max-height:75vh; overflow-y:auto;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+                <h2 id="detail-title" style="font-size:1.2rem; color:var(--accent); margin:0;"></h2>
+                <button class="btn-sm btn-outline" onclick="closeDetail()">Show All</button>
+            </div>
+            <table id="detail-table">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Quality</th>
+                        <th>Score</th>
+                        <th>Entry Type</th>
+                        <th>PMax</th>
+                        <th>TF (Data)</th>
+                        <th>LT Filter</th>
+                        <th>MT Filter</th>
+                        <th>IS Trades</th>
+                        <th>IS Calmar</th>
+                        <th>IS DD</th>
+                        <th>IS PF</th>
+                        <th>IS Sharpe</th>
+                        <th>IS WR</th>
+                        <th>OOS Trades</th>
+                        <th>OOS Calmar</th>
+                        <th>OOS DD</th>
+                        <th>OOS PF</th>
+                        <th>Gate</th>
+                        <th>WFE</th>
+                        <th>Pert.</th>
+                        <th>WF Stab.</th>
+                        <th>Mode</th>
+                        <th>Date</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="detail-tbody"></tbody>
+            </table>
+        </div>
+
+        <!-- Empty state -->
+        <div id="empty-state" class="empty-state" style="display:none;">
+            <div class="icon">&#127942;</div>
+            <p>No backtest results in the database yet.</p>
+            <p style="font-size:0.85rem; margin-top:0.5rem;">Run an optimization on the <a href="/explore" style="color:var(--accent);">Explore</a> page to populate best configs.</p>
+        </div>
+    </div>
+
+    <!-- Detail Modal (TradingView-style) -->
+    <div id="modal" onclick="if(event.target===this)this.classList.remove('active')">
+        <div id="modal-content">
+            <!-- Header -->
+            <div class="tv-modal-header">
+                <h2 id="modal-title">PFA69.3</h2>
+                <button class="tv-modal-close" onclick="document.getElementById('modal').classList.remove('active')">&times;</button>
+            </div>
+            <!-- Subtitle -->
+            <div id="modal-subtitle" style="padding:4px 16px 0; font-size:0.78rem; color:#787b86;"></div>
+            <!-- Tabs -->
+            <div class="tv-tabs">
+                <div class="tv-tab active">Inputs</div>
+            </div>
+            <!-- KPI bar -->
+            <div class="tv-kpi-bar" id="modal-kpi"></div>
+            <!-- Config body -->
+            <div class="tv-config-body" id="modal-params"></div>
+            <!-- Raw export -->
+            <div style="padding:0 16px;">
+                <details style="margin-top:0.5rem;">
+                    <summary style="color:#787b86; font-size:0.78rem; cursor:pointer;">Raw TradingView Export</summary>
+                    <pre class="tv-export" id="modal-tv-export" style="margin-top:0.5rem;"></pre>
+                </details>
+            </div>
+            <!-- Footer -->
+            <div class="tv-modal-footer">
+                <button class="tv-btn" onclick="copyModalText()">Copy TV Config</button>
+                <button class="tv-btn tv-btn-primary" onclick="copyJsonConfig()">Copy JSON</button>
+            </div>
+            <p id="copy-feedback" style="color:#00a67d; font-size:0.78rem; text-align:center; padding:0 16px 8px; min-height:1.2em;"></p>
+        </div>
+    </div>
+
+    <script>
+    let bestData = {};        // {instrument: [configs]}
+    let selectedInst = null;
+
+    // ── Load best configs ──
+    async function loadBest() {
+        const topN = document.getElementById('filter-topn').value;
+        const inst = document.getElementById('filter-instrument').value;
+        let url = `/api/db/best?top_n=${topN}`;
+        if (inst) url += `&instrument=${inst}`;
+
+        try {
+            const res = await fetch(url);
+            const data = await res.json();
+            bestData = data.best || {};
+            renderSummaryGrid();
+
+            if (selectedInst && bestData[selectedInst]) {
+                showInstrumentDetail(selectedInst);
+            } else if (Object.keys(bestData).length > 0) {
+                // Auto-select first instrument
+                showInstrumentDetail(Object.keys(bestData)[0]);
+            } else {
+                document.getElementById('detail-section').classList.remove('active');
+                document.getElementById('empty-state').style.display = 'block';
+            }
+        } catch (e) {
+            console.error('loadBest:', e);
+        }
+    }
+
+    // ── Render summary cards ──
+    function renderSummaryGrid() {
+        const grid = document.getElementById('summary-grid');
+        const empty = document.getElementById('empty-state');
+        const instruments = Object.keys(bestData);
+
+        if (instruments.length === 0) {
+            grid.innerHTML = '';
+            empty.style.display = 'block';
+            return;
+        }
+        empty.style.display = 'none';
+
+        grid.innerHTML = instruments.map(inst => {
+            const configs = bestData[inst];
+            const best = configs[0] || {};
+            const oosPass = configs.filter(c => c.oos_gate_pass).length;
+            const bestCalmar = Math.max(...configs.map(c => c.oos_calmar || 0));
+            const bestPF = Math.max(...configs.map(c => c.oos_profit_factor || 0));
+            const bestDD = Math.min(...configs.map(c => c.oos_max_dd || 0));
+            const isActive = selectedInst === inst;
+
+            return `<div class="summary-card ${isActive ? 'active' : ''}" onclick="showInstrumentDetail('${inst}')">
+                <div class="inst-name">
+                    <span>${inst} ${oosPass > 0 ? '<span class="badge badge-pass">'+oosPass+' PASS</span>' : '<span class="badge badge-fail">0 PASS</span>'}</span>
+                    <span class="count">${configs.length} configs</span>
+                </div>
+                <div class="summary-mini">
+                    <div class="item">
+                        <div class="val" style="color:${bestCalmar >= 0.5 ? 'var(--green)' : bestCalmar >= 0.25 ? 'var(--orange)' : 'var(--red)'};">${bestCalmar.toFixed(2)}</div>
+                        <div class="lbl">Best OOS Calmar</div>
+                    </div>
+                    <div class="item">
+                        <div class="val" style="color:${bestPF >= 1.3 ? 'var(--green)' : bestPF >= 1.1 ? 'var(--orange)' : 'var(--red)'};">${bestPF.toFixed(2)}</div>
+                        <div class="lbl">Best OOS PF</div>
+                    </div>
+                    <div class="item">
+                        <div class="val" style="color:${bestDD >= -5 ? 'var(--green)' : bestDD >= -8 ? 'var(--orange)' : 'var(--red)'};">${bestDD.toFixed(1)}%</div>
+                        <div class="lbl">Best OOS DD</div>
+                    </div>
+                </div>
+            </div>`;
+        }).join('');
+    }
+
+    // ── Show detail for one instrument ──
+    function showInstrumentDetail(inst) {
+        selectedInst = inst;
+        const configs = bestData[inst] || [];
+        const section = document.getElementById('detail-section');
+        const tbody = document.getElementById('detail-tbody');
+        const title = document.getElementById('detail-title');
+
+        title.textContent = `${inst} - Top ${configs.length} Configurations`;
+        section.classList.add('active');
+
+        // Re-render summary cards to highlight active
+        renderSummaryGrid();
+
+        tbody.innerHTML = configs.map((c, i) => {
+            const rank = i + 1;
+            const pmax = `${c.pmax_ma_type||'EMA'}(${c.pmax_length||''}) x${(c.pmax_multiplier||0).toFixed(1)}`;
+
+            // LT filter display
+            let lt = 'OFF';
+            if (c.use_lt_filter) {
+                lt = `${c.lt_ma_type||'EMA'}(${c.lt_length||20})`;
+                lt += ` <span class="tf-tag">${c.lt_tf||'W'}</span>`;
+                lt += ` x${(c.lt_multiplier||1).toFixed(1)}`;
+            }
+
+            // MT filter display
+            let mt = 'OFF';
+            if (c.use_mt_filter) {
+                mt = `${c.mt_ma_type||'EMA'}(${c.mt_length||10})`;
+                mt += ` <span class="tf-tag">${c.mt_tf||'4H'}</span>`;
+                mt += ` x${(c.mt_multiplier||1).toFixed(1)}`;
+            }
+
+            // Infer data timeframe from run data_file if available
+            let dataTf = '';
+            if (c.data_file) {
+                const m = c.data_file.match(/_([A-Z]\d{1,2}|M\d+|H\d+|D|W)_/i);
+                if (m) dataTf = m[1];
+            }
+
+            // OOS Gate: show which condition(s) failed (adaptive DD threshold)
+            const ddLimit = c._dd_limit || -8.0;
+            let gateReasons = [];
+            if (!c.oos_gate_pass) {
+                if ((c.oos_calmar||0) < 0.25) gateReasons.push('Calmar<0.25');
+                if ((c.oos_profit_factor||0) < 1.20) gateReasons.push('PF<1.20');
+                if ((c.oos_max_dd||0) < ddLimit) gateReasons.push(`DD<${ddLimit}%`);
+                if ((c.oos_trades||0) < 15) gateReasons.push('Trades<15');
+            }
+            const gateTooltip = gateReasons.length > 0 ? ` title="FAIL: ${gateReasons.join(', ')}"` : '';
+            const gate = c.oos_gate_pass ? '<span class="badge badge-pass">PASS</span>' : `<span class="badge badge-fail"${gateTooltip}>FAIL</span>`;
+            // WFE display: N/A if null (V5.4)
+            let wfe = '<span style="color:var(--text-muted);">N/A</span>';
+            if (c.wfe != null && c.wfe !== null) {
+                const wfePct = c.wfe * 100;
+                if (wfePct > 100) {
+                    wfe = `<span style="color:var(--orange);" title="WFE >100% = OOS better than IS (likely luck, not robustness)">${wfePct.toFixed(0)}% ⚠</span>`;
+                } else if (wfePct >= 50) {
+                    wfe = `<span style="color:var(--green);">${wfePct.toFixed(0)}%</span>`;
+                } else if (wfePct >= 40) {
+                    wfe = `${wfePct.toFixed(0)}%`;
+                } else {
+                    wfe = `<span style="color:var(--red);">${wfePct.toFixed(0)}%</span>`;
+                }
+            }
+            const pert = c.perturbation_stable != null ? (c.perturbation_stable ? '<span class="badge badge-pass">STABLE</span>' : '<span class="badge badge-fail">FRAGILE</span>') : '-';
+            const wfStab = c.wf_stability != null ? `${c.wf_stability.toFixed(0)}/100` : '-';
+            const date = c.run_date ? c.run_date.slice(0, 10) : '';
+
+            const rowClass = c.oos_gate_pass ? 'style="border-left:3px solid var(--green);"' : '';
+
+            // V5.4: Grade badge
+            const grade = c._grade || '';
+            const gradeClass = grade ? `badge-${grade}` : '';
+            const gradeBadge = grade ? `<span class="badge ${gradeClass}">${grade}</span>` : '';
+            const robustness = c._robustness != null ? c._robustness.toFixed(0) : '-';
+            const flags = (c._flags || []);
+            const flagsHtml = flags.length > 0 ? `<span style="color:var(--orange);font-size:0.7rem;" title="${flags.join(', ')}">${flags.length} flag${flags.length>1?'s':''}</span>` : '';
+
+            const quality = c._quality || 0;
+            return `<tr ${rowClass}>
+                <td><strong>${rank}</strong> ${rank === 1 ? '<span class="badge badge-gold">BEST</span>' : ''}</td>
+                <td style="color:var(--accent);font-weight:600;" title="Quality = Gate(+5) + OOS Calmar(cap 2.0) + WFE(cap100%)*2.5 + WF Stab*2.0 + WF Cons*0.5 + Pert(+0.5) + IS*0.2 — WFE penalty: >150%=-1.5, >120%=-0.8, >100%=-0.3">${quality.toFixed(2)} ${gradeBadge}</td>
+                <td>${(c.score||0).toFixed(4)}</td>
+                <td>${c.entry_type||''}</td>
+                <td style="font-size:0.75rem;">${pmax}</td>
+                <td>${dataTf ? '<span class="tf-tag">'+dataTf+'</span>' : '-'}</td>
+                <td style="font-size:0.75rem;">${lt}</td>
+                <td style="font-size:0.75rem;">${mt}</td>
+                <td>${c.is_trades||0}</td>
+                <td>${(c.is_calmar||0).toFixed(3)}</td>
+                <td>${(c.is_max_dd||0).toFixed(1)}%</td>
+                <td>${(c.is_profit_factor||0).toFixed(2)}</td>
+                <td>${(c.is_sharpe||0).toFixed(2)}</td>
+                <td>${(c.is_win_rate||0).toFixed(1)}%</td>
+                <td>${c.oos_trades||0}</td>
+                <td style="font-weight:700; color:${(c.oos_calmar||0) >= 0.5 ? 'var(--green)' : (c.oos_calmar||0) >= 0.25 ? 'var(--orange)' : 'var(--red)'};">${(c.oos_calmar||0).toFixed(3)}</td>
+                <td style="color:${(c.oos_max_dd||0) >= -5 ? 'var(--green)' : (c.oos_max_dd||0) >= -8 ? 'var(--orange)' : 'var(--red)'};">${(c.oos_max_dd||0).toFixed(1)}%</td>
+                <td>${(c.oos_profit_factor||0).toFixed(2)}</td>
+                <td>${gate}</td>
+                <td>${wfe}</td>
+                <td>${pert}</td>
+                <td>${wfStab}</td>
+                <td style="font-size:0.75rem;">${c.mode||''}</td>
+                <td style="font-size:0.75rem;">${date}</td>
+                <td><button class="btn-sm btn-outline" onclick="showConfigDetail(${c.id})">View</button></td>
+            </tr>`;
+        }).join('');
+    }
+
+    function closeDetail() {
+        selectedInst = null;
+        document.getElementById('detail-section').classList.remove('active');
+        renderSummaryGrid();
+    }
+
+    // ── Config detail modal ──
+    async function showConfigDetail(configId) {
+        try {
+            const res = await fetch(`/api/db/config/${configId}`);
+            const c = await res.json();
+            if (c.error) { alert(c.error); return; }
+            window._currentDetail = c;
+
+            // Infer data timeframe
+            let dataTf = '';
+            if (c.data_file) {
+                const m = c.data_file.match(/_([A-Z]\d{1,2}|M\d+|H\d+|D|W)_/i);
+                if (m) dataTf = m[1];
+            }
+
+            document.getElementById('modal-title').textContent =
+                `${c.instrument || 'Unknown'} ${dataTf ? '| ' + dataTf : ''}`;
+            document.getElementById('modal-subtitle').textContent =
+                `Rank #${c.rank || '?'} | ${c.entry_type || ''} | ${c.run_date ? c.run_date.slice(0,10) : ''} | ${c.mode || 'Focused'}`;
+
+            // Build TV-style parameters
+            document.getElementById('modal-params').innerHTML = buildTvConfig(c);
+
+            document.getElementById('modal-tv-export').textContent = c.tv_export || 'No TV export available';
+            document.getElementById('copy-feedback').textContent = '';
+            document.getElementById('modal').classList.add('active');
+
+            // Toggle group collapse
+            document.querySelectorAll('.tv-group-header').forEach(h => {
+                h.onclick = () => {
+                    h.classList.toggle('collapsed');
+                    h.nextElementSibling.classList.toggle('collapsed');
+                };
+            });
+        } catch (e) { console.error('showConfigDetail:', e); }
+    }
+
+    // ══════════════════════════════════════════════════════════════════════
+    // buildTvConfig() — mirrors TradingView PF_Algo V69.3 input groups EXACTLY
+    // Groups appear in the same order as in Pine Script.
+    // NO internal optimizer params (pmax_ma_mode, pmax_ma_factor, pmax_ma_distance).
+    // ══════════════════════════════════════════════════════════════════════
+    function buildTvConfig(c) {
+        // Helpers
+        function grp(title, bodyHtml, startOpen) {
+            const cls = startOpen === false ? ' collapsed' : '';
+            return `<div class="tv-group">` +
+                   `<div class="tv-group-header${cls}"><span class="chevron">&#9660;</span> ${title}</div>` +
+                   `<div class="tv-group-body${cls}">${bodyHtml}</div></div>`;
+        }
+        function row(label, val) {
+            return `<div class="tv-row"><span class="tv-label">${label}</span><span class="tv-value">${val}</span></div>`;
+        }
+        function inlineRow(pairs) {
+            let h = '<div class="tv-row-inline">';
+            for (const [label, val] of pairs) {
+                h += `<div class="tv-inline-pair"><span class="tv-label">${label}</span><span class="tv-value">${val}</span></div>`;
+            }
+            return h + '</div>';
+        }
+        function check(label, val) {
+            const cls = val ? 'on' : 'off';
+            const tick = val ? '\u2713' : '';
+            return `<div class="tv-row-check"><span class="tv-check-box ${cls}">${tick}</span><span class="tv-check-label">${label}</span></div>`;
+        }
+        const on = v => `<span class="on">${v}</span>`;
+        const off = v => `<span class="off">${v || 'OFF'}</span>`;
+        const fmtTime = v => { const s = String(v||0).padStart(4,'0'); return s.slice(0,2)+':'+s.slice(2); };
+
+        let html = '';
+
+        // 1. Fib Levels
+        {
+            let fibBody = inlineRow([['TF', c.fib_tf || 'D'], ['Fib Length', c.fib_length || 265]]);
+            const zones = c.fib_zones || [true,true,true,true,true,true];
+            const zLabels = ['0.000\u21920.236','0.236\u21920.382','0.382\u21920.500','0.500\u21920.618','0.618\u21920.764','0.764\u21921.000'];
+            for (let i = 0; i < 6; i += 2) {
+                const z1 = Array.isArray(zones) ? (zones[i] !== false) : true;
+                const z2 = (i+1 < 6 && Array.isArray(zones)) ? (zones[i+1] !== false) : true;
+                fibBody += inlineRow([[zLabels[i], z1 ? on('ON') : off()], [zLabels[i+1], z2 ? on('ON') : off()]]);
+            }
+            html += grp('Fib Levels', fibBody, false);
+        }
+
+        // 2. Moving Average + ATR
+        html += grp('Moving Average + ATR',
+            row('ATR Mult', (c.pmax_multiplier||3.0).toFixed(1)) +
+            inlineRow([['MA Type', c.pmax_ma_type || 'EMA'], ['MA Length', c.pmax_length || 10]])
+        , true);
+
+        // 3. Entries
+        html += grp('Entries',
+            row('Entry Type', `<strong>${c.entry_type || 'Donc+Chikou'}</strong>`) +
+            inlineRow([['Long Side', c.long_side !== false ? on('Yes') : off('No')],
+                       ['Short Side', c.short_side !== false ? on('Yes') : off('No')]]) +
+            row('Pause between orders', c.order_pause || 5)
+        , true);
+
+        // 4. Entry-type-specific group
+        const et = c.entry_type || '';
+        if (et === 'VWAP') {
+            html += grp('Entry #1 - VWAP',
+                inlineRow([['VWAP StdDev', (c.vwap_stddev_mult||2.0).toFixed(1)], ['StdDev Length', c.vwap_length||20]]) +
+                check('Confirmation Candle', c.vwap_confirmation !== false)
+            , true);
+        } else if (et === 'Fractal') {
+            html += grp('Entry #2 - Fractals',
+                row('Buffer Point', (c.fractal_buffer||0).toFixed(1))
+            , true);
+        } else if (et === 'Boll+SMA') {
+            html += grp('Entry #3 - Boll+SMA',
+                inlineRow([['BB MA Len', c.length_bb_ma||20], ['StdDev', (c.mult_bb_ma||2.0).toFixed(1)]]) +
+                row('BB SMA Len', c.length_bb_sma||50)
+            , true);
+        } else if (et === 'ORB') {
+            html += grp('Entry #5 - ORB',
+                row('First Minutes of the day', c.orb_minutes||15)
+            , true);
+        } else if (et === 'Donc+Chikou') {
+            html += grp('Entry #6 - Donc+Chikou',
+                row('Donchian Channel Period', c.don_length||20)
+            , true);
+        } else if (et === 'RSI Divergence') {
+            html += grp('Entry #7 - RSI Divergence',
+                inlineRow([['RSI Length', c.rsi_div_length||14], ['Pivot Lookback', c.rsi_div_pivot||5]]) +
+                inlineRow([['Overbought', c.rsi_div_overbought||70], ['Oversold', c.rsi_div_oversold||30]]) +
+                check('Detect Hidden Divergences', c.rsi_div_hidden !== false)
+            , true);
+        } else if (et === 'MM Cross') {
+            html += grp('Entry #8 - MM Cross',
+                inlineRow([['MM1 Type', c.mm_cross_ma1_type||'EMA'], ['MM1 Length', c.mm_cross_ma1_len||9]]) +
+                inlineRow([['MM2 Type', c.mm_cross_ma2_type||'EMA'], ['MM2 Length', c.mm_cross_ma2_len||21]])
+            , true);
+        }
+
+        // 5. Filter - Long-term moving average
+        if (c.use_lt_filter) {
+            html += grp('Filter - Long-term moving average',
+                inlineRow([['LT Trend Filter', on('ON')], ['TF', c.lt_tf||'D'], ['Multiplier', (c.lt_multiplier||1.5).toFixed(1)]]) +
+                inlineRow([['MA Type', c.lt_ma_type||'EMA'], ['MA Length', c.lt_length||20]])
+            , true);
+        } else {
+            html += grp('Filter - Long-term moving average',
+                inlineRow([['LT Trend Filter', off()]])
+            , false);
+        }
+
+        // 6. Filter - Medium-term moving average
+        if (c.use_mt_filter) {
+            html += grp('Filter - Medium-term moving average',
+                inlineRow([['MT Trend Filter', on('ON')], ['TF', c.mt_tf||'240'], ['Multiplier', (c.mt_multiplier||1.5).toFixed(1)]]) +
+                inlineRow([['MA Type', c.mt_ma_type||'EMA'], ['MA Length', c.mt_length||10]])
+            , true);
+        } else {
+            html += grp('Filter - Medium-term moving average',
+                inlineRow([['MT Trend Filter', off()]])
+            , false);
+        }
+
+        // 7. Session days and Session hours (always visible like in TV)
+        {
+            const dayNames = ['M','T','W','TH','F','SA','S'];
+            const dayKeys = ['day_m','day_t','day_w','day_th','day_f','day_sa','day_s'];
+            let daysHtml = '<div class="tv-row" style="gap:4px;flex-wrap:wrap;justify-content:flex-start;">';
+            dayNames.forEach((d, i) => {
+                const isOn = c[dayKeys[i]] !== false;
+                const cls = isOn ? 'on' : 'off';
+                const tick = isOn ? '\u2713' : '';
+                daysHtml += `<span style="display:inline-flex;align-items:center;gap:3px;margin-right:8px;"><span class="tv-check-box ${cls}" style="width:14px;height:14px;font-size:0.6rem;">${tick}</span><span style="font-size:0.78rem;color:${isOn?'#131722':'#b2b5be'};">${d}</span></span>`;
+            });
+            daysHtml += '</div>';
+            let s1 = c.session1_raw || '';
+            let s2 = c.session2_raw || '';
+            if (!s1 && (c.session1_start != null || c.session1_end != null))
+                s1 = fmtTime(c.session1_start) + '-' + fmtTime(c.session1_end);
+            if (!s2 && (c.session2_start != null || c.session2_end != null))
+                s2 = fmtTime(c.session2_start) + '-' + fmtTime(c.session2_end);
+            if (!s1) s1 = '0000-1200';
+            if (!s2) s2 = '1200-2359';
+            const sessBody = daysHtml + row('Session 1', s1) + row('Session 2', s2);
+            html += grp('Session days and Session hours', sessBody, c.use_session_filter ? true : false);
+        }
+
+        // 8. Filter - WMA SMA
+        html += grp('Filter - WMA SMA',
+            check('WMA/SMA Filter', !!c.use_wma_sma_filter)
+        , !!c.use_wma_sma_filter);
+
+        // 9. Filter - Macro
+        if (c.use_macro_filter) {
+            html += grp('Filter - Macro',
+                inlineRow([['Macro Score Filter', on('ON')], ['Mode', c.macro_mode||'Combined']]) +
+                inlineRow([['Min Total', c.macro_min != null ? c.macro_min : -50], ['Max Total', c.macro_max != null ? c.macro_max : 50]])
+            , true);
+        } else {
+            html += grp('Filter - Macro',
+                inlineRow([['Macro Score Filter', off()]])
+            , false);
+        }
+
+        // 10. Filter - SNAB RSI
+        const rsiActive = c.use_rsi50_filter || c.use_rsi_ema_filter;
+        html += grp('Filter - SNAB RSI',
+            inlineRow([['RSI > 50 Filter', c.use_rsi50_filter ? on('ON') : off()],
+                       ['RSI > EMA Filter', c.use_rsi_ema_filter ? on('ON') : off()]]) +
+            inlineRow([['RSI Length', c.rsi_length||14], ['EMA of RSI Length', c.rsi_ema_length||12]])
+        , rsiActive);
+
+        // 11. Filter - QQ Estimation
+        if (c.use_qq_filter || c.use_qqe_filter) {
+            html += grp('Filter - QQ Estimation',
+                row('QQ Estimation Filter', on('ON')) +
+                row('RSI Length', c.qq_length || c.qqe_length || 14)
+            , true);
+        } else {
+            html += grp('Filter - QQ Estimation',
+                row('QQ Estimation Filter', off())
+            , false);
+        }
+
+        // 12. Security Layer 0 - VIX
+        if (c.use_vix_filter) {
+            html += grp('Security Layer 0 - VIX',
+                inlineRow([['VIX Filter', on('ON')], ['Low (Risk-On)', c.vix_threshold_low||10], ['High (Risk-Off)', c.vix_threshold_high||30]])
+            , true);
+        } else {
+            html += grp('Security Layer 0 - VIX',
+                inlineRow([['VIX Filter', off()]])
+            , false);
+        }
+
+        // 13. Security Layer 1 - Volatility
+        if (c.use_vol_filter) {
+            html += grp('Security Layer 1 - Volatility',
+                inlineRow([['Adaptive Volatility Filter', on('ON')], ['Max Volatility Percentile', c.vol_percentile_threshold||70]])
+            , true);
+        } else {
+            html += grp('Security Layer 1 - Volatility',
+                inlineRow([['Adaptive Volatility Filter', off()]])
+            , false);
+        }
+
+        // 14. Security Layer 2 - Correlation
+        if (c.use_correlation_filter) {
+            html += grp('Security Layer 2 - Correlation',
+                inlineRow([['Correlation Filter', on('ON')]]) +
+                inlineRow([['Correlation Length', c.corr_length||20], ['Min Correlation', (c.corr_threshold||0.5).toFixed(1)]])
+            , true);
+        } else {
+            html += grp('Security Layer 2 - Correlation',
+                inlineRow([['Correlation Filter', off()]])
+            , false);
+        }
+
+        // 15. Security Layer 3 - Max Hold Days
+        if ((c.use_max_hold_days || c.max_hold_days) && c.max_hold_days > 0) {
+            html += grp('Security Layer 3 - Max Hold Days',
+                inlineRow([['Max Hold Days', on('ON')], ['Max Days', c.max_hold_days]]) +
+                inlineRow([['Profit Exception', c.max_hold_profit_exception !== false ? on('Yes') : off('No')],
+                           ['Min Profit %', (c.max_hold_profit_pct||c.max_hold_days_profit_pct||1.0).toFixed(1)]])
+            , true);
+        } else {
+            html += grp('Security Layer 3 - Max Hold Days',
+                inlineRow([['Max Hold Days', off()]])
+            , false);
+        }
+
+        // 16. Security Layer 4 - MTF Momentum
+        if (c.use_mtf_momentum) {
+            html += grp('Security Layer 4 - MTF Momentum',
+                inlineRow([['Multi-TF Momentum', on('ON')]]) +
+                inlineRow([['TF1', c.mtf_tf1||'15'], ['TF2', c.mtf_tf2||'60'], ['TF3', c.mtf_tf3||'D']])
+            , true);
+        } else {
+            html += grp('Security Layer 4 - MTF Momentum',
+                inlineRow([['Multi-TF Momentum', off()]])
+            , false);
+        }
+
+        // 17. Security Layer 5 - Gap Protection
+        if (c.use_gap_protection) {
+            html += grp('Security Layer 5 - Gap Protection',
+                inlineRow([['Gap Protection', on('ON')], ['Max Gap %', (c.max_gap_pct||2.0).toFixed(1)]])
+            , true);
+        } else {
+            html += grp('Security Layer 5 - Gap Protection',
+                inlineRow([['Gap Protection', off()]])
+            , false);
+        }
+
+        // 18. Filter - ATR EMA
+        if (c.use_atr_ema_filter) {
+            html += grp('Filter - ATR EMA',
+                inlineRow([['ATR EMA Filter', on('ON')], ['ATR Length', c.atr_ema_len||14]]) +
+                inlineRow([['EMA1 len', c.ema1_atr_ema_len||10], ['EMA2 len', c.ema2_atr_ema_len||20]])
+            , true);
+        } else {
+            html += grp('Filter - ATR EMA',
+                inlineRow([['ATR EMA Filter', off()]])
+            , false);
+        }
+
+        // 19. Filter - Max Candles
+        if (c.use_max_candles_filter) {
+            html += grp('Filter - Max Candles',
+                inlineRow([['Max Candles Filter', on('ON')], ['Candles Count', c.max_candles||100]])
+            , true);
+        } else {
+            html += grp('Filter - Max Candles',
+                inlineRow([['Max Candles Filter', off()]])
+            , false);
+        }
+
+        // 20. Filter - MAvg Direction
+        html += grp('Filter - MAvg Direction',
+            inlineRow([['MA Direction Filter', c.use_ma_dir_filter ? on('ON') : off()],
+                       ...(c.use_ma_dir_filter ? [['MA Direction Len', c.ma_dir_len||3]] : [])])
+        , !!c.use_ma_dir_filter);
+
+        // 21. Filter - MAvg
+        html += grp('Filter - MAvg',
+            row('MAvg Filter', c.use_mavg_filter ? on('ON') : off())
+        , !!c.use_mavg_filter);
+
+        // 22. Filter - Diff. MA and Red Line
+        html += grp('Filter - Diff. MA and Red Line',
+            inlineRow([['Diff MA/Red Filter', c.use_diff_ma_red ? on('ON') : off()],
+                       ...(c.use_diff_ma_red ? [['Max Diff (%)', (c.diff_ma_red_pct||1.0).toFixed(1)]] : [])])
+        , !!c.use_diff_ma_red);
+
+        // 23. Filter - Diff. Price and Red Line
+        html += grp('Filter - Diff. Price and Red Line',
+            inlineRow([['Diff Price/Red Filter', c.use_diff_price_red ? on('ON') : off()],
+                       ...(c.use_diff_price_red ? [['Max Diff (%)', (c.diff_price_red_pct||1.0).toFixed(1)]] : [])])
+        , !!c.use_diff_price_red);
+
+        // 24. ADX Regime Filter V.69.1
+        if (c.use_adx_regime_filter) {
+            html += grp('ADX Regime Filter V.69.1',
+                inlineRow([['ADX Regime Filter', on('ON')]]) +
+                inlineRow([['ADX Period', c.adx_period||14], ['Trend >', c.adx_trend_threshold||25], ['Reversion <', c.adx_reversion_threshold||20]])
+            , true);
+        } else {
+            html += grp('ADX Regime Filter V.69.1',
+                inlineRow([['ADX Regime Filter', off()]])
+            , false);
+        }
+
+        // 25. Risk Management
+        let rmHtml = '';
+        const slMode = c.sl_mode || 'static_pct';
+        let slLabel;
+        if (slMode === 'static_pct' || slMode === 'Static - %') slLabel = 'Static - %';
+        else if (slMode === 'atr_based' || slMode === 'ATR-Based') slLabel = 'ATR-Based';
+        else if (slMode === 'red_line' || slMode === 'Red Line') slLabel = 'Red Line';
+        else if (slMode === 'no' || slMode === 'No') slLabel = 'No';
+        else slLabel = slMode;
+        rmHtml += row('SL Mode', slLabel);
+        if (slMode === 'static_pct' || slMode === 'Static - %') rmHtml += row('Static SL (%)', (c.sl_pct||30).toFixed(1));
+        if (slMode === 'atr_based' || slMode === 'ATR-Based') rmHtml += row('ATR Multiple (SL)', (c.atr_sl_mult||2.0).toFixed(1));
+        if (c.sl_dynamic) {
+            rmHtml += inlineRow([['Dynamic SL Adjustment', on('ON')], ['Vol Min', (c.sl_vol_min_mult||0.8).toFixed(2)], ['Vol Max', (c.sl_vol_max_mult||1.5).toFixed(1)]]);
+        } else {
+            rmHtml += check('Dynamic SL Adjustment', false);
+        }
+        const tpMode = c.tp_mode || 'no';
+        let tpLabel;
+        if (tpMode === 'no') tpLabel = 'No';
+        else if (tpMode === 'static_pct') tpLabel = 'Static - %';
+        else if (tpMode === 'sl_ratio') tpLabel = 'SL Ratio';
+        else if (tpMode === 'rl_pct' || tpMode === 'red_line_pct') tpLabel = 'Static - Red Line %';
+        else tpLabel = tpMode;
+        rmHtml += row('PT Mode', tpLabel);
+        if (tpMode === 'static_pct') rmHtml += row('PT - Percent (%)', (c.tp_pct||2).toFixed(1));
+        if (tpMode === 'sl_ratio') rmHtml += row('PT - SL Ratio', (c.tp_sl_ratio||2).toFixed(1));
+        if (tpMode === 'rl_pct' || tpMode === 'red_line_pct') rmHtml += row('PT - Red Line distance (%)', (c.tp_rl_pct||100).toFixed(0));
+        if (c.use_partial_tp) {
+            rmHtml += check('Partial TP', true);
+            rmHtml += inlineRow([['TP1 %', (c.tp1_pct||1).toFixed(1)], ['TP1 Size %', c.tp1_size||30]]);
+            rmHtml += inlineRow([['TP2 %', (c.tp2_pct||2).toFixed(1)], ['TP2 Size %', c.tp2_size||30]]);
+        } else {
+            rmHtml += check('Partial TP', false);
+        }
+        const beMode = c.be_mode || 'no';
+        if (beMode !== 'no') {
+            rmHtml += row('BE Mode', on(beMode === 'be_tp' || beMode === 'be_only' ? 'BE + TP' : beMode === 'be_tsl' ? 'BE + TP + TSL' : beMode === 'be_tp2_tsl' ? 'BE + TPx2 + TSL' : beMode));
+            rmHtml += row('BE - Percent (%)', (c.be_trigger_pct||50).toFixed(0));
+        } else {
+            rmHtml += row('BE Mode', off('No'));
+        }
+        if (c.use_dynamic_tsl || c.use_tsl) {
+            rmHtml += inlineRow([['Dynamic TSL', on('ON')], ['TSL ATR Mult', (c.tsl_atr_mult||2.0).toFixed(1)]]);
+        } else {
+            rmHtml += check('Dynamic TSL', false);
+        }
+        if (c.bars_in_loss_enable || c.use_bars_in_loss) {
+            rmHtml += inlineRow([['Max Bars in Loss', on('ON')], ['Bars Count', c.bars_in_loss||55]]);
+        } else {
+            rmHtml += check('Max Bars in Loss', false);
+        }
+        rmHtml += check('Exit at Setup Reversal', c.exit_setup_reversal !== false);
+        html += grp('Risk Management', rmHtml, true);
+
+        return html;
+    }
+
+    function copyModalText() {
+        const text = document.getElementById('modal-tv-export').textContent;
+        navigator.clipboard.writeText(text).then(() => {
+            document.getElementById('copy-feedback').textContent = 'TV config copied!';
+        });
+    }
+
+    function copyJsonConfig() {
+        const c = window._currentDetail;
+        if (!c || !c.config_json) return;
+        navigator.clipboard.writeText(c.config_json).then(() => {
+            document.getElementById('copy-feedback').textContent = 'JSON config copied!';
+        });
+    }
+
+    function exportCsv() {
+        const inst = document.getElementById('filter-instrument').value;
+        let url = `/api/db/export_csv?oos_gate_only=0`;
+        if (inst) url += `&instrument=${inst}`;
+        window.location.href = url;
+    }
+
+    // ── Init ──
+    loadBest();
+    </script>
+    <div style="position:fixed;bottom:6px;right:12px;font-size:0.65rem;color:#3a506b;letter-spacing:0.5px;pointer-events:none;z-index:9999;">{{ build_number }}</div>
+</body>
+</html>

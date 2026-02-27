@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PF AI Lab 5.4.8 Explorer</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+    <!-- Plotly loaded only on pages that use charts -->
+    <style>
+        :root {
+            /* PleneufTrading-aligned dark palette */
+            --bg-dark: #0a1628;
+            --bg-card: #0f2035;
+            --bg-input: #162a42;
+            --border: #1e3a5f;
+            --text: #e8edf4;
+            --text-muted: #8ba3be;
+            --accent: #00C8C8;
+            --accent-hover: #00B4D8;
+            --navy: #004C8C;
+            --green: #00D084;
+            --red: #f85149;
+            --orange: #f0a030;
+            --purple: #bc8cff;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+               background: var(--bg-dark); color: var(--text); min-height: 100vh; }
+
+        /* Navigation */
+        nav { background: var(--bg-card); border-bottom: 1px solid var(--border); padding: 0 2rem; display: flex; align-items: center; height: 60px; }
+        nav .logo { font-size: 1.3rem; font-weight: 700; color: #e8edf4; margin-right: 2rem; letter-spacing: 0.5px; }
+        nav .logo .brand { color: var(--accent); }
+        nav .logo span { color: var(--green); }
+        nav a { color: var(--text-muted); text-decoration: none; padding: 0.5rem 1rem; border-radius: 6px; margin: 0 0.2rem; font-size: 0.9rem; transition: all 0.2s; }
+        nav a:hover, nav a.active { color: var(--text); background: var(--bg-input); }
+
+        /* Main content */
+        .container { max-width: 1200px; margin: 0 auto; padding: 2rem; }
+        h1 { font-size: 2rem; margin-bottom: 0.5rem; }
+        h2 { font-size: 1.4rem; margin-bottom: 1rem; color: var(--accent); }
+        .subtitle { color: var(--text-muted); margin-bottom: 2rem; font-size: 0.95rem; }
+
+        /* Cards */
+        .card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; margin-bottom: 1.5rem; }
+        .card h3 { font-size: 1.1rem; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem; }
+
+        /* Phase cards */
+        .phases { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem; margin-top: 2rem; }
+        .phase { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem; transition: transform 0.2s, border-color 0.2s; }
+        .phase:hover { transform: translateY(-2px); border-color: var(--accent); box-shadow: 0 4px 20px rgba(0, 200, 200, 0.1); }
+        .phase .number { font-size: 2rem; font-weight: 700; color: var(--accent); margin-bottom: 0.5rem; }
+        .phase h3 { font-size: 1.2rem; margin-bottom: 0.5rem; }
+        .phase p { color: var(--text-muted); font-size: 0.9rem; line-height: 1.5; }
+        .phase .arrow { text-align: center; color: var(--accent); font-size: 1.5rem; margin-top: 1rem; }
+        .phase a { display: inline-block; margin-top: 1rem; padding: 0.5rem 1rem; background: var(--accent); color: var(--bg-dark); border-radius: 6px; text-decoration: none; font-weight: 600; font-size: 0.9rem; transition: all 0.2s; }
+        .phase a:hover { background: var(--accent-hover); box-shadow: 0 2px 12px rgba(0, 200, 200, 0.3); }
+
+        /* Warning box */
+        .warning { background: rgba(210, 153, 34, 0.1); border: 1px solid var(--orange); border-radius: 8px; padding: 1rem 1.5rem; margin: 1.5rem 0; }
+        .warning strong { color: var(--orange); }
+
+        /* Philosophy */
+        .philosophy { font-style: italic; color: var(--text-muted); border-left: 3px solid var(--accent); padding-left: 1rem; margin: 2rem 0; font-size: 1.1rem; }
+
+        /* Gradient accents */
+        .gradient-text { background: linear-gradient(135deg, var(--accent), var(--green)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    </style>
+</head>
+<body>
+    <nav>
+        <div class="logo"><span class="brand">PF AI Lab</span> <span>{{ app_version }}</span></div>
+        <a href="/" class="active">Home</a>
+        <a href="/data">1. Data</a>
+        <a href="/explore">2. Explore</a>
+        <a href="/test">3. Test</a>
+        <a href="/validate">4. Validate</a>
+        <a href="/portfolio">5. Portfolio</a>
+        <a href="/best">Best Configs</a>
+        <a href="/audit">Audit</a>
+        <a href="/database">DB</a>
+    </nav>
+
+    <div class="container">
+        <h1>PF AI Lab 5.4.8 Explorer</h1>
+        <p class="subtitle">Hybrid Parameter Exploration Tool — Python explores, TradingView validates, Python analyzes.</p>
+
+        <div class="warning">
+            <strong>Key Principle:</strong> Python results are EXPLORATORY (approx. ±10-30% vs TradingView).
+            Only TradingView Strategy Tester results count for deployment decisions.
+        </div>
+
+        <div class="phases">
+            <div class="phase">
+                <div class="number">01</div>
+                <h3>Upload Data</h3>
+                <p>Upload your OHLCV data (TradingView CSV, MT5 CSV, or Excel). Auto-detects format.</p>
+                <a href="/data">Upload Data</a>
+            </div>
+
+            <div class="phase">
+                <div class="number">02</div>
+                <h3>Explore Parameters</h3>
+                <p>Run Optuna NSGA-II optimization (500+ trials). Identifies promising REGIONS in parameter space, not exact configs.</p>
+                <a href="/explore">Start Exploration</a>
+            </div>
+
+            <div class="phase">
+                <div class="number">03</div>
+                <h3>Validate in TV</h3>
+                <p>Copy top configs to TradingView. Export Strategy Tester trades. Run Monte Carlo (10K sims) for robustness scoring.</p>
+                <a href="/validate">Validate Trades</a>
+            </div>
+
+            <div class="phase">
+                <div class="number">04</div>
+                <h3>Portfolio Analysis</h3>
+                <p>Multi-instrument correlation matrix. Combined equity curve. Optimal allocation (equal weight / risk parity).</p>
+                <a href="/portfolio">Portfolio</a>
+            </div>
+        </div>
+
+        <div class="philosophy">
+            "Un bloc a la fois, un edge a la fois." — Better 1 robust config than 10 fragile ones.
+        </div>
+
+        <div class="card" style="margin-top: 2rem;">
+            <h3>Architecture Overview</h3>
+            <pre style="color: var(--text-muted); font-size: 0.85rem; line-height: 1.6; overflow-x: auto;">
+Phase 1: EXPLORATION PYTHON        &lt;-- Fast, approximate, exploratory
+  Optuna NSGA-II, 500+ trials          Goal: identify REGIONS, NOT exact configs
+  Data: CSV MT5 or TradingView
+         |
+         | Top 10-20 candidate configs
+         v
+Phase 2: EXPORT TO TRADINGVIEW     &lt;-- Copy-paste format for Pine Script V69.1
+  User tests manually in                Strategy Tester
+         |
+         | Excel trade export (done by user)
+         v
+Phase 3: POST-HOC VALIDATION       &lt;-- Precise, based on REAL TV trades
+  Monte Carlo (10,000 sims)             Zero divergence by construction
+  Walk-Forward Analysis
+  Portfolio Analysis
+  Final Scoring &amp; Report
+            </pre>
+        </div>
+    </div>
+    <div style="position:fixed;bottom:6px;right:12px;font-size:0.65rem;color:#3a506b;letter-spacing:0.5px;pointer-events:none;z-index:9999;">{{ build_number }}</div>
+</body>
+</html>

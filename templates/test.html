@@ -1,0 +1,1194 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PF AI Lab 5.4.8 - Test de Robustesse</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+    <style>
+        :root { --bg-dark: #0a1628; --bg-card: #0f2035; --bg-input: #162a42; --border: #1e3a5f; --text: #e8edf4; --text-muted: #8ba3be; --accent: #00C8C8; --accent-hover: #00B4D8; --navy: #004C8C; --green: #00D084; --red: #f85149; --orange: #f0a030; --purple: #bc8cff; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg-dark); color: var(--text); }
+        nav { background: var(--bg-card); border-bottom: 1px solid var(--border); padding: 0 2rem; display: flex; align-items: center; height: 60px; }
+        nav .logo { font-size: 1.3rem; font-weight: 700; color: #e8edf4; margin-right: 2rem; letter-spacing: 0.5px; }
+        nav .logo .brand { color: var(--accent); }
+        nav .logo span { color: var(--green); }
+        nav a { color: var(--text-muted); text-decoration: none; padding: 0.5rem 1rem; border-radius: 6px; margin: 0 0.2rem; font-size: 0.9rem; }
+        nav a:hover, nav a.active { color: var(--text); background: var(--bg-input); }
+        .container { max-width: 1200px; margin: 0 auto; padding: 2rem; }
+        h1 { font-size: 1.8rem; margin-bottom: 1.5rem; }
+        .card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; margin-bottom: 1.5rem; }
+        .error { background: rgba(248, 81, 73, 0.1); border: 1px solid var(--red); padding: 1rem; border-radius: 6px; margin: 1rem 0; white-space: pre-wrap; }
+        input, select, button, textarea { background: var(--bg-input); border: 1px solid var(--border); color: var(--text); padding: 0.5rem 1rem; border-radius: 6px; font-size: 0.9rem; }
+        button { cursor: pointer; background: var(--accent); color: var(--bg-dark); font-weight: 600; border: none; padding: 0.7rem 1.5rem; transition: all 0.2s; }
+        button:hover { background: var(--accent-hover); box-shadow: 0 2px 12px rgba(0, 200, 200, 0.3); }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; }
+        .stat { padding: 1rem; background: var(--bg-input); border-radius: 6px; }
+        .stat .label { color: var(--text-muted); font-size: 0.8rem; margin-bottom: 0.3rem; }
+        .stat .value { font-size: 1.5rem; font-weight: 700; }
+        .badge { display: inline-block; padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.75rem; font-weight: 600; }
+        .badge-pass { background: rgba(0,208,132,0.15); color: var(--green); }
+        .badge-fail { background: rgba(248,81,73,0.15); color: var(--red); }
+        .badge-warn { background: rgba(240,160,48,0.15); color: var(--orange); }
+        table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+        th, td { padding: 0.5rem 0.7rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { color: var(--text-muted); font-weight: 600; }
+        .verdict-box { padding: 1.5rem; border-radius: 8px; text-align: center; margin: 1.5rem 0; }
+        .verdict-pass { background: rgba(0,208,132,0.1); border: 2px solid var(--green); }
+        .verdict-warn { background: rgba(240,160,48,0.1); border: 2px solid var(--orange); }
+        .verdict-fail { background: rgba(248,81,73,0.1); border: 2px solid var(--red); }
+        .wf-gauge { width: 120px; height: 8px; background: var(--bg-dark); border-radius: 4px; overflow: hidden; display: inline-block; vertical-align: middle; margin-left: 0.5rem; }
+        .wf-gauge-fill { height: 100%; border-radius: 4px; }
+        .loading-overlay { display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(10,22,40,0.85); z-index:9999; justify-content:center; align-items:center; flex-direction:column; gap:1rem; }
+        .loading-overlay.active { display:flex; }
+        .spinner { width:48px; height:48px; border:4px solid var(--border); border-top:4px solid var(--accent); border-radius:50%; animation:spin 0.8s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .fl { display:block; color:var(--text-muted); font-size:0.78rem; margin-bottom:0.2rem; }
+        .desc { color:var(--text-muted); font-size:0.75rem; margin-bottom:0.6rem; opacity:0.8; line-height:1.4; }
+        .section-desc { color:var(--text-muted); font-size:0.78rem; margin-bottom:1rem; line-height:1.5; padding:0.6rem 0.8rem; background:rgba(255,255,255,0.03); border-radius:4px; border-left:2px solid var(--border); }
+        select, input[type="number"] { width:100%; }
+        /* Filter blocks: always show params, greyed when OFF */
+        .filter-block { margin-bottom:0.8rem; padding:0.8rem; background:var(--bg-input); border-radius:6px; transition: opacity 0.2s; }
+        .filter-block h4 { font-size:0.88rem; color:var(--text); margin-bottom:0.1rem; }
+        .filter-block.disabled-block { opacity:0.4; }
+        .filter-block.disabled-block select:not(.filter-toggle),
+        .filter-block.disabled-block input:not(.filter-toggle) { pointer-events:none; }
+        select:disabled, input:disabled { opacity:0.35; cursor:not-allowed; }
+        /* Tooltip-style descriptions inline */
+        .param-hint { font-size:0.68rem; color:var(--text-muted); opacity:0.7; display:block; margin-top:0.15rem; }
+        .tv-tag { display:inline-block; background:rgba(0,200,200,0.12); color:var(--accent); font-size:0.65rem; padding:0.1rem 0.35rem; border-radius:3px; font-weight:600; letter-spacing:0.3px; margin-left:0.3rem; vertical-align:middle; }
+    </style>
+</head>
+<body>
+    <nav>
+        <div class="logo"><span class="brand">PF AI Lab</span> <span>{{ app_version }}</span></div>
+        <a href="/">Home</a>
+        <a href="/data">1. Data</a>
+        <a href="/explore">2. Explore</a>
+        <a href="/test" class="active">3. Test</a>
+        <a href="/validate">4. Validate</a>
+        <a href="/portfolio">5. Portfolio</a>
+        <a href="/best">Best Configs</a>
+        <a href="/audit">Audit</a>
+        <a href="/database">DB</a>
+    </nav>
+
+    <div class="container">
+        <h1>Test de Robustesse</h1>
+        <p style="color:var(--text-muted); margin-bottom:1.5rem;">
+            Configurez votre strategie exactement comme dans TradingView (memes parametres que PF_Algo V69), uploadez le fichier OHLCV, et le moteur testera la
+            <strong>perturbation</strong>, le <strong>walk-forward</strong>, et la <strong>validation OOS</strong> pour evaluer la robustesse.
+        </p>
+
+        {% if error %}
+        <div class="error">{{ error }}</div>
+        {% endif %}
+
+        {% if not result %}
+        <form method="POST" enctype="multipart/form-data" id="test-form">
+            <!-- Hidden field: mode indicator (form vs json) -->
+            <input type="hidden" name="input_mode" id="input-mode" value="form">
+
+            <!-- ============================================== -->
+            <!-- TAB SELECTOR: Visual Form vs Import JSON       -->
+            <!-- ============================================== -->
+            <div style="display:flex; gap:0; margin-bottom:1.5rem;">
+                <button type="button" id="tab-form" onclick="switchTab('form')"
+                        style="flex:1; border-radius:6px 0 0 0; padding:0.8rem; font-size:0.9rem; border:1px solid var(--accent); background:var(--accent); color:var(--bg-dark);">
+                    Configurer (comme TradingView)
+                </button>
+                <button type="button" id="tab-json" onclick="switchTab('json')"
+                        style="flex:1; border-radius:0; padding:0.8rem; font-size:0.9rem; border:1px solid var(--border); background:var(--bg-input); color:var(--text-muted);">
+                    Importer JSON
+                </button>
+                <button type="button" id="tab-tv" onclick="switchTab('tv')"
+                        style="flex:1; border-radius:0 6px 0 0; padding:0.8rem; font-size:0.9rem; border:1px solid var(--border); background:var(--bg-input); color:var(--text-muted);">
+                    Importer depuis TV
+                </button>
+            </div>
+
+            <!-- ============================================== -->
+            <!-- VISUAL FORM (default)                          -->
+            <!-- ============================================== -->
+            <div id="panel-form">
+
+            <!-- ══════════════════════════════════════════════ -->
+            <!-- Section 1: PMax Settings                       -->
+            <!-- ══════════════════════════════════════════════ -->
+            <div class="card" style="border-left:3px solid var(--accent);">
+                <h3 style="color:var(--accent); margin-bottom:0.3rem;">PMax Settings <span class="tv-tag">PF_Algo V69</span></h3>
+                <div class="section-desc">
+                    <strong>PMax</strong> = <em>Profit Maximizer</em>. C'est le coeur de la strategie : une <strong>Moyenne Mobile</strong> (MA) combinee avec l'<strong>ATR</strong> (Average True Range)
+                    pour creer la <strong>Red Line</strong> (ligne de stop dynamique).<br>
+                    <strong>Red Line</strong> = MA &plusmn; (ATR &times; Multiplier). Elle sert de trailing stop et definit la tendance : prix au-dessus = haussier, en-dessous = baissier.
+                </div>
+                <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(180px,1fr)); gap:0.8rem;">
+                    <div>
+                        <label class="fl">Type de Moyenne Mobile <span class="tv-tag">Inp MA Type</span></label>
+                        <select name="pmax_ma_type" id="f-pmax_ma_type">
+                            <option value="SMA">SMA</option>
+                            <option value="EMA" selected>EMA (defaut)</option>
+                            <option value="WMA">WMA</option>
+                            <option value="TMA">TMA</option>
+                            <option value="TRIMA">TRIMA</option>
+                            <option value="VAR">VAR</option>
+                            <option value="WWMA">WWMA</option>
+                            <option value="ZLEMA">ZLEMA</option>
+                            <option value="TSF">TSF</option>
+                        </select>
+                        <span class="param-hint">Type de calcul de la moyenne mobile PMax</span>
+                    </div>
+                    <div>
+                        <label class="fl">Longueur MA <span class="tv-tag">Inp Length</span></label>
+                        <input type="number" name="pmax_length" id="f-pmax_length" value="10" min="5" max="30">
+                        <span class="param-hint">Nombre de periodes pour le calcul de la MA (defaut: 10)</span>
+                    </div>
+                    <div>
+                        <label class="fl">Multiplicateur ATR <span class="tv-tag">Inp Multiplier</span></label>
+                        <input type="number" name="pmax_multiplier" id="f-pmax_multiplier" value="3.0" min="1.5" max="5.0" step="0.1">
+                        <span class="param-hint">Plus haut = Red Line plus eloignee du prix (defaut: 3.0)</span>
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- ══════════════════════════════════════════════ -->
+            <!-- Section 2: Entry Signal                        -->
+            <!-- ══════════════════════════════════════════════ -->
+            <div class="card" style="border-left:3px solid #6c5ce7;">
+                <h3 style="color:#6c5ce7; margin-bottom:0.3rem;">Signal d'Entree <span class="tv-tag">Inp Entry Type</span></h3>
+                <div class="section-desc">
+                    Le <strong>type de signal</strong> qui declenche les entrees Long/Short. Chaque signal a ses propres parametres specifiques.<br>
+                    <strong>Order Pause</strong> = nombre minimum de barres a attendre entre deux trades (evite l'over-trading).
+                </div>
+                <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(180px,1fr)); gap:0.8rem;">
+                    <div>
+                        <label class="fl">Type de Signal</label>
+                        <select name="entry_type" id="f-entry_type" onchange="toggleEntryParams()">
+                            <option value="Donc+Chikou" selected>Donc+Chikou (Donchian + Ichimoku Chikou)</option>
+                            <option value="RSI Divergence">RSI Divergence</option>
+                            <option value="Fractal">Fractal (Williams)</option>
+                            <option value="Boll+SMA">Bollinger + SMA</option>
+                            <option value="MM Cross">Croisement de Moyennes Mobiles</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="fl">Order Pause <span class="tv-tag">Inp allowed_between_signals</span></label>
+                        <input type="number" name="order_pause" id="f-order_pause" value="5" min="3" max="10">
+                        <span class="param-hint">Nb barres minimum entre 2 trades (defaut: 5)</span>
+                    </div>
+                </div>
+                <!-- Conditional entry params -->
+                <div id="entry-params-donc" style="margin-top:0.8rem; padding:0.6rem; background:rgba(108,92,231,0.08); border-radius:6px;">
+                    <h4 style="font-size:0.82rem; color:#6c5ce7; margin-bottom:0.4rem;">Parametres Donc+Chikou</h4>
+                    <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(180px,1fr)); gap:0.8rem;">
+                        <div>
+                            <label class="fl">Periode Donchian <span class="tv-tag">Inp don_length</span></label>
+                            <input type="number" name="don_length" id="f-don_length" value="20" min="10" max="55">
+                            <span class="param-hint">Canal Donchian : High/Low sur N periodes (defaut: 20)</span>
+                        </div>
+                    </div>
+                </div>
+                <div id="entry-params-rsi" style="display:none; margin-top:0.8rem; padding:0.6rem; background:rgba(108,92,231,0.08); border-radius:6px;">
+                    <h4 style="font-size:0.82rem; color:#6c5ce7; margin-bottom:0.4rem;">Parametres RSI Divergence</h4>
+                    <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(180px,1fr)); gap:0.8rem;">
+                        <div>
+                            <label class="fl">RSI Length</label>
+                            <input type="number" name="rsi_div_length" id="f-rsi_div_length" value="14" min="7" max="30">
+                        </div>
+                        <div>
+                            <label class="fl">Pivot Lookback</label>
+                            <input type="number" name="rsi_div_pivot" id="f-rsi_div_pivot" value="5" min="2" max="10">
+                        </div>
+                        <div>
+                            <label class="fl">Hidden Divergence</label>
+                            <select name="rsi_div_hidden" id="f-rsi_div_hidden">
+                                <option value="true" selected>ON</option>
+                                <option value="false">OFF</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div id="entry-params-fractal" style="display:none; margin-top:0.8rem; padding:0.6rem; background:rgba(108,92,231,0.08); border-radius:6px;">
+                    <h4 style="font-size:0.82rem; color:#6c5ce7; margin-bottom:0.4rem;">Parametres Fractal</h4>
+                    <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(180px,1fr)); gap:0.8rem;">
+                        <div>
+                            <label class="fl">Buffer Point</label>
+                            <input type="number" name="fractal_buffer" id="f-fractal_buffer" value="0.0" min="0.0" max="5.0" step="0.5">
+                        </div>
+                    </div>
+                </div>
+                <div id="entry-params-boll" style="display:none; margin-top:0.8rem; padding:0.6rem; background:rgba(108,92,231,0.08); border-radius:6px;">
+                    <h4 style="font-size:0.82rem; color:#6c5ce7; margin-bottom:0.4rem;">Parametres Bollinger + SMA</h4>
+                    <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(180px,1fr)); gap:0.8rem;">
+                        <div>
+                            <label class="fl">BB MA Length</label>
+                            <input type="number" name="length_bb_ma" id="f-length_bb_ma" value="20" min="10" max="40">
+                        </div>
+                        <div>
+                            <label class="fl">BB StdDev</label>
+                            <input type="number" name="mult_bb_ma" id="f-mult_bb_ma" value="2.0" min="1.0" max="3.5" step="0.1">
+                        </div>
+                        <div>
+                            <label class="fl">BB SMA Length</label>
+                            <input type="number" name="length_bb_sma" id="f-length_bb_sma" value="50" min="20" max="100">
+                        </div>
+                    </div>
+                </div>
+                <div id="entry-params-mmcross" style="display:none; margin-top:0.8rem; padding:0.6rem; background:rgba(108,92,231,0.08); border-radius:6px;">
+                    <h4 style="font-size:0.82rem; color:#6c5ce7; margin-bottom:0.4rem;">Parametres MM Cross (signal d'entree)</h4>
+                    <p class="desc">Croisement de 2 Moyennes Mobiles comme signal d'entree : Long quand la rapide croise au-dessus de la lente, Short quand en-dessous.</p>
+                    <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(180px,1fr)); gap:0.8rem;">
+                        <div>
+                            <label class="fl">MM1 Type (Rapide)</label>
+                            <select name="mm_cross_ma1_type" id="f-mm_cross_ma1_type"><option value="EMA" selected>EMA</option><option value="TRIMA">TRIMA</option></select>
+                        </div>
+                        <div>
+                            <label class="fl">MM1 Longueur</label>
+                            <input type="number" name="mm_cross_ma1_len" id="f-mm_cross_ma1_len" value="9" min="3" max="50">
+                        </div>
+                        <div>
+                            <label class="fl">MM2 Type (Lente)</label>
+                            <select name="mm_cross_ma2_type" id="f-mm_cross_ma2_type"><option value="EMA" selected>EMA</option><option value="TRIMA">TRIMA</option></select>
+                        </div>
+                        <div>
+                            <label class="fl">MM2 Longueur</label>
+                            <input type="number" name="mm_cross_ma2_len" id="f-mm_cross_ma2_len" value="21" min="10" max="200">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ══════════════════════════════════════════════ -->
+            <!-- Section 3: Trend Filters (LT + MT)              -->
+            <!-- ══════════════════════════════════════════════ -->
+            <div class="card" style="border-left:3px solid var(--green);">
+                <h3 style="color:var(--green); margin-bottom:0.3rem;">Filtres de Tendance &amp; Confirmation</h3>
+
+                <!-- ── LT Trend Filter ── -->
+                <div class="filter-block disabled-block" id="lt-block">
+                    <h4 style="color:var(--green);">
+                        Filtre Tendance Long Terme (LT)
+                        <span class="tv-tag">Inp LT Trend filter</span>
+                    </h4>
+                    <div class="section-desc" style="margin-bottom:0.6rem; padding:0.4rem 0.6rem;">
+                        <strong>Bloque les trades contre la tendance de fond (higher timeframe)</strong>.<br>
+                        Le filtre calcule un <strong>PMax sur le timeframe superieur</strong> (ex: Weekly) :<br>
+                        &bull; <strong>Long autorise</strong> si le prix est <strong>au-dessus</strong> de la Red Line HTF (= MA + ATR &times; Mult sur le TF superieur)<br>
+                        &bull; <strong>Short autorise</strong> si le prix est <strong>en-dessous</strong> de la Red Line HTF<br>
+                        Vous definissez le <strong>Timeframe</strong>, le <strong>Type de MA</strong>, la <strong>Longueur</strong> et le <strong>Multiplicateur ATR</strong> utilises pour ce PMax HTF.
+                    </div>
+                    <div style="display:grid; grid-template-columns:90px repeat(4, 1fr); gap:0.6rem; align-items:end;">
+                        <div>
+                            <label class="fl">Activer</label>
+                            <select name="use_lt_filter" id="f-use_lt_filter" class="filter-toggle" onchange="toggleLtFilter()">
+                                <option value="false" selected>OFF</option>
+                                <option value="true">ON</option>
+                            </select>
+                        </div>
+                        <div class="lt-dep">
+                            <label class="fl">Timeframe <span class="tv-tag">Inp LT TF</span></label>
+                            <select name="lt_tf" id="f-lt_tf" disabled>
+                                {% for tf in lt_timeframes %}
+                                <option value="{{ tf }}" {% if tf == 'W' %}selected{% endif %}>{{ tf }}</option>
+                                {% endfor %}
+                            </select>
+                            <span class="param-hint">Timeframe du PMax LT (defaut: Weekly)</span>
+                        </div>
+                        <div class="lt-dep">
+                            <label class="fl">Type MA <span class="tv-tag">Inp LT MA Type</span></label>
+                            <select name="lt_ma_type" id="f-lt_ma_type" disabled>
+                                <option value="EMA" selected>EMA</option>
+                                <option value="SMA">SMA</option>
+                            </select>
+                            <span class="param-hint">Type de moyenne mobile (defaut: EMA)</span>
+                        </div>
+                        <div class="lt-dep">
+                            <label class="fl">Longueur MA <span class="tv-tag">Inp LT MA Length</span></label>
+                            <input type="number" name="lt_length" id="f-lt_length" value="20" min="10" max="30" disabled>
+                            <span class="param-hint">Nb periodes MA sur le TF LT (defaut: 20)</span>
+                        </div>
+                        <div class="lt-dep">
+                            <label class="fl">Multiplicateur ATR <span class="tv-tag">Inp LT Multiplier</span></label>
+                            <select name="lt_multiplier" id="f-lt_multiplier" disabled>
+                                <option value="0.5">0.5</option><option value="1.0">1.0</option><option value="1.5" selected>1.5</option>
+                                <option value="2.0">2.0</option><option value="2.5">2.5</option><option value="3.0">3.0</option>
+                            </select>
+                            <span class="param-hint">Largeur de la Red Line LT = ATR &times; ce multiplicateur (defaut: 1.5)</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ── MT Trend Filter ── -->
+                <div class="filter-block disabled-block" id="mt-block">
+                    <h4 style="color:var(--green);">
+                        Filtre Tendance Moyen Terme (MT)
+                        <span class="tv-tag">Inp MT Trend filter</span>
+                    </h4>
+                    <div class="section-desc" style="margin-bottom:0.6rem; padding:0.4rem 0.6rem;">
+                        <strong>Meme logique que le filtre LT, mais sur un timeframe intermediaire</strong> (ex: 4H).<br>
+                        Permet de filtrer les entrees en combinant une vision <strong>long terme + moyen terme</strong> de la tendance.<br>
+                        &bull; <strong>Long autorise</strong> si le prix est au-dessus de la Red Line MT<br>
+                        &bull; <strong>Short autorise</strong> si le prix est en-dessous de la Red Line MT
+                    </div>
+                    <div style="display:grid; grid-template-columns:90px repeat(4, 1fr); gap:0.6rem; align-items:end;">
+                        <div>
+                            <label class="fl">Activer</label>
+                            <select name="use_mt_filter" id="f-use_mt_filter" class="filter-toggle" onchange="toggleMtFilter()">
+                                <option value="false" selected>OFF</option>
+                                <option value="true">ON</option>
+                            </select>
+                        </div>
+                        <div class="mt-dep">
+                            <label class="fl">Timeframe <span class="tv-tag">Inp MT TF</span></label>
+                            <select name="mt_tf" id="f-mt_tf" disabled>
+                                {% for tf in mt_timeframes %}
+                                <option value="{{ tf }}" {% if tf == '4H' %}selected{% endif %}>{{ tf }}</option>
+                                {% endfor %}
+                            </select>
+                            <span class="param-hint">Timeframe du PMax MT (defaut: 4H)</span>
+                        </div>
+                        <div class="mt-dep">
+                            <label class="fl">Type MA <span class="tv-tag">Inp MT MA Type</span></label>
+                            <select name="mt_ma_type" id="f-mt_ma_type" disabled>
+                                <option value="EMA" selected>EMA</option>
+                                <option value="SMA">SMA</option>
+                            </select>
+                            <span class="param-hint">Type de moyenne mobile (defaut: EMA)</span>
+                        </div>
+                        <div class="mt-dep">
+                            <label class="fl">Longueur MA <span class="tv-tag">Inp MT MA Length</span></label>
+                            <input type="number" name="mt_length" id="f-mt_length" value="10" min="5" max="20" disabled>
+                            <span class="param-hint">Nb periodes MA sur le TF MT (defaut: 10)</span>
+                        </div>
+                        <div class="mt-dep">
+                            <label class="fl">Multiplicateur ATR <span class="tv-tag">Inp MT Multiplier</span></label>
+                            <select name="mt_multiplier" id="f-mt_multiplier" disabled>
+                                <option value="0.5">0.5</option><option value="1.0">1.0</option><option value="1.5" selected>1.5</option>
+                                <option value="2.0">2.0</option><option value="2.5">2.5</option><option value="3.0">3.0</option>
+                            </select>
+                            <span class="param-hint">Largeur de la Red Line MT (defaut: 1.5)</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ── RSI > 50 ── -->
+                <div class="filter-block">
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
+                        <div>
+                            <h4 style="font-size:0.85rem;">RSI &gt; 50 Filter <span class="tv-tag">Inp RSI 50 Filter</span></h4>
+                            <p class="desc" style="margin-bottom:0.3rem;">
+                                <strong>Long</strong> autorise uniquement si RSI(14) &gt; 50.<br>
+                                <strong>Short</strong> autorise uniquement si RSI(14) &lt; 50.
+                            </p>
+                            <select name="use_rsi50_filter" id="f-use_rsi50_filter" style="width:100px;">
+                                <option value="false" selected>OFF</option><option value="true">ON</option>
+                            </select>
+                        </div>
+                        <div>
+                            <h4 style="font-size:0.85rem;">MA Direction Filter <span class="tv-tag">Inp MA Dir Filter</span></h4>
+                            <p class="desc" style="margin-bottom:0.3rem;">
+                                Bloque le trade si la MA ne monte pas (Long) ou ne descend pas (Short) sur les <strong>N dernieres barres</strong>.
+                            </p>
+                            <div style="display:grid; grid-template-columns:100px 1fr; gap:0.4rem; align-items:end;">
+                                <select name="use_ma_dir_filter" id="f-use_ma_dir_filter" onchange="toggleMaDir()">
+                                    <option value="false" selected>OFF</option><option value="true">ON</option>
+                                </select>
+                                <div class="madir-dep">
+                                    <label class="fl">Nb barres</label>
+                                    <input type="number" name="ma_dir_len" id="f-ma_dir_len" value="3" min="2" max="5" disabled>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ── MAvg Position ── -->
+                <div class="filter-block">
+                    <h4 style="font-size:0.85rem;">MAvg Position Filter <span class="tv-tag">Inp MAvg Filter</span></h4>
+                    <p class="desc" style="margin-bottom:0.3rem;">
+                        <strong>Long</strong> autorise si le prix est au-dessus de la MA PMax.<br>
+                        <strong>Short</strong> autorise si le prix est en-dessous de la MA PMax.
+                    </p>
+                    <div style="width:100px;">
+                        <select name="use_mavg_filter" id="f-use_mavg_filter"><option value="false" selected>OFF</option><option value="true">ON</option></select>
+                    </div>
+                </div>
+
+                <!-- ── Diff MA / Red Line ── -->
+                <div class="filter-block" id="diffma-block">
+                    <h4 style="font-size:0.85rem;">
+                        Diff MA / Red Line (ecart max en %)
+                        <span class="tv-tag">Inp diff_ma_filter</span>
+                    </h4>
+                    <div class="section-desc" style="margin-bottom:0.6rem; padding:0.4rem 0.6rem;">
+                        <strong>Bloque l'entree si l'ecart entre la Moyenne Mobile PMax et la Red Line depasse le % defini.</strong><br>
+                        Quand la MA est tres eloignee de la Red Line, le stop dynamique est large et le risk/reward defavorable.<br>
+                        <strong>Exemple</strong> : Max Diff = 1% &rarr; si |MA - RedLine| / prix > 1%, le trade est bloque.<br>
+                        <em>Plus le % est bas, plus le filtre est strict.</em>
+                    </div>
+                    <div style="display:grid; grid-template-columns:100px 160px; gap:0.8rem; align-items:end;">
+                        <div>
+                            <label class="fl">Activer</label>
+                            <select name="use_diff_ma_red" id="f-use_diff_ma_red" onchange="toggleDiffMa()">
+                                <option value="false" selected>OFF</option><option value="true">ON</option>
+                            </select>
+                        </div>
+                        <div class="diffma-dep">
+                            <label class="fl" style="color:var(--orange); font-weight:600;">Max Diff (%) <span class="tv-tag">Inp diff %</span></label>
+                            <input type="number" name="diff_ma_red_pct" id="f-diff_ma_red_pct" value="1.0" min="0.1" max="10.0" step="0.1" disabled>
+                            <span class="param-hint">% maximum d'ecart autorise (defaut: 1.0%)</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ── Diff Price / Red Line ── -->
+                <div class="filter-block" id="diffprice-block">
+                    <h4 style="font-size:0.85rem;">
+                        Diff Price / Red Line (ecart max en %)
+                        <span class="tv-tag">Inp diff_price_filter</span>
+                    </h4>
+                    <div class="section-desc" style="margin-bottom:0.6rem; padding:0.4rem 0.6rem;">
+                        <strong>Bloque l'entree si l'ecart entre le Prix actuel et la Red Line depasse le % defini.</strong><br>
+                        Quand le prix est tres loin de la Red Line (zone PMax), entrer expose a un retour rapide vers le stop.<br>
+                        <strong>Exemple</strong> : Max Diff = 1% &rarr; si |Prix - RedLine| / prix > 1%, le trade est bloque.<br>
+                        <em>Plus le % est bas, plus le filtre est strict.</em>
+                    </div>
+                    <div style="display:grid; grid-template-columns:100px 160px; gap:0.8rem; align-items:end;">
+                        <div>
+                            <label class="fl">Activer</label>
+                            <select name="use_diff_price_red" id="f-use_diff_price_red" onchange="toggleDiffPrice()">
+                                <option value="false" selected>OFF</option><option value="true">ON</option>
+                            </select>
+                        </div>
+                        <div class="diffprice-dep">
+                            <label class="fl" style="color:var(--orange); font-weight:600;">Max Diff (%) <span class="tv-tag">Inp diff %</span></label>
+                            <input type="number" name="diff_price_red_pct" id="f-diff_price_red_pct" value="1.0" min="0.1" max="10.0" step="0.1" disabled>
+                            <span class="param-hint">% maximum d'ecart autorise (defaut: 1.0%)</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ══════════════════════════════════════════════ -->
+            <!-- Section 5: Risk Management                     -->
+            <!-- ══════════════════════════════════════════════ -->
+            <div class="card" style="border-left:3px solid var(--red);">
+                <h3 style="color:var(--red); margin-bottom:0.3rem;">Risk Management <span class="tv-tag">Inp SL Mode</span></h3>
+                <div class="section-desc">
+                    <strong>Comment le Stop Loss est gere</strong> et quels cotes (Long/Short) sont autorises.<br>
+                    <strong>4 modes de SL disponibles :</strong><br>
+                    &bull; <strong>Static - %</strong> : SL fixe a X% du prix d'entree (ex: 30% = SL large, 5% = SL serre)<br>
+                    &bull; <strong>Red Line</strong> : SL place directement sur la Red Line PMax (stop dynamique qui suit le prix)<br>
+                    &bull; <strong>ATR-Based</strong> : SL = prix &plusmn; (ATR &times; Multiple). Vous definissez le <strong>multiple de l'ATR</strong> ci-dessous. Plus le multiple est haut, plus le SL est large. <em>Recommande: 1.5 - 3.0</em><br>
+                    &bull; <strong>No SL</strong> : pas de stop loss (sortie uniquement par signal inverse)
+                </div>
+                <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(170px,1fr)); gap:0.8rem; align-items:end;">
+                    <div>
+                        <label class="fl">SL Mode</label>
+                        <select name="sl_mode" id="f-sl_mode" onchange="toggleSlMode()">
+                            <option value="static_pct" selected>Static - % (SL fixe en %)</option>
+                            <option value="red_line">Red Line (SL = PMax)</option>
+                            <option value="atr_based">ATR-Based (SL dynamique ATR)</option>
+                            <option value="none">No SL (pas de stop)</option>
+                        </select>
+                    </div>
+                    <div id="sl-static-wrap">
+                        <label class="fl" style="color:var(--orange); font-weight:600;">SL % du prix <span class="tv-tag">Inp SL %</span></label>
+                        <input type="number" name="sl_pct" id="f-sl_pct" value="30.0" min="1" max="50" step="0.5">
+                        <span class="param-hint">% de perte max par trade (defaut: 30%)</span>
+                    </div>
+                    <div id="sl-atr-wrap" style="display:none;">
+                        <label class="fl" style="color:var(--orange); font-weight:600;">Multiple ATR pour le SL <span class="tv-tag">Inp atr_sl_mult</span></label>
+                        <input type="number" name="atr_sl_mult" id="f-atr_sl_mult" value="2.0" min="0.5" max="5.0" step="0.5">
+                        <span class="param-hint">SL = prix &plusmn; (ATR(14) &times; ce multiple). Recommande: 1.5 - 3.0 (defaut: 2.0)</span>
+                    </div>
+                    <div>
+                        <label class="fl">Exit Setup Reversal</label>
+                        <select name="exit_setup_reversal" id="f-exit_setup_reversal">
+                            <option value="true" selected>ON (ferme si signal inverse)</option>
+                            <option value="false">OFF</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="fl">Long Side</label>
+                        <select name="long_side" id="f-long_side"><option value="true" selected>ON</option><option value="false">OFF</option></select>
+                    </div>
+                    <div>
+                        <label class="fl">Short Side</label>
+                        <select name="short_side" id="f-short_side"><option value="true" selected>ON</option><option value="false">OFF</option></select>
+                    </div>
+                </div>
+            </div>
+
+            </div><!-- end panel-form -->
+
+            <!-- ============================================== -->
+            <!-- JSON IMPORT PANEL (hidden by default)          -->
+            <!-- ============================================== -->
+            <div id="panel-json" style="display:none;">
+                <div class="card">
+                    <h3 style="margin-bottom:1rem;">Importer un JSON</h3>
+                    <p style="color:var(--text-muted); font-size:0.82rem; margin-bottom:0.8rem;">
+                        Collez le JSON d'une configuration issue de la page Explore (bouton "Copy JSON Config") ou creee manuellement.
+                    </p>
+                    <textarea name="config_json" id="json-textarea" rows="12" style="width:100%; font-family:monospace; font-size:0.8rem;"
+                              placeholder='{"entry_type": "Donc+Chikou", "pmax_length": 15, "pmax_multiplier": 3.5, "pmax_ma_type": "EMA", ...}'>{{ prefill_config or '' }}</textarea>
+                    <div style="display:flex; gap:0.6rem; margin-top:0.5rem;">
+                        <button type="button" onclick="loadJsonIntoForm()" style="background:var(--green); font-size:0.82rem; padding:0.4rem 1rem;">
+                            Charger dans le formulaire
+                        </button>
+                        <span style="color:var(--text-muted); font-size:0.75rem; align-self:center;">
+                            Le JSON sera converti dans le formulaire visuel ci-dessus
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ============================================== -->
+            <!-- TV SETTINGS IMPORT PANEL (hidden by default)   -->
+            <!-- ============================================== -->
+            <div id="panel-tv" style="display:none;">
+                <div class="card" style="border-left:3px solid var(--orange);">
+                    <h3 style="color:var(--orange); margin-bottom:0.5rem;">Importer depuis TradingView (via alertes)</h3>
+                    <p style="color:var(--text-muted); font-size:0.82rem; margin-bottom:0.8rem;">
+                        <strong>Mapping automatique via les alertes</strong> : un patch PineScript ajoute le JSON de la config
+                        dans chaque alerte. Collez le texte de n'importe quelle alerte ci-dessous.
+                    </p>
+
+                    <!-- MAIN: Paste alert/JSON -->
+                    <div style="background:var(--bg-card); border:1px solid var(--orange); border-radius:6px; padding:1rem; margin-bottom:1rem;">
+                        <h4 style="color:var(--orange); margin-bottom:0.5rem;">Collez une alerte ou un JSON</h4>
+                        <p style="color:var(--text-muted); font-size:0.78rem; margin-bottom:0.5rem;">
+                            Accepte : alerte PineConnector enrichie, JSON brut, webhook JSON, ou copie de table.
+                        </p>
+                        <textarea id="tv-settings-textarea" rows="8" style="width:100%; font-family:monospace; font-size:0.8rem; background:var(--bg-input); color:var(--text); border:1px solid var(--border); border-radius:4px; padding:0.5rem;"
+                                  placeholder='Exemples de formats acceptes :&#10;&#10;1. Alerte enrichie:&#10;6119578435797,buy,BTCUSDT,sl=42000,risk=1.0&#10;PFLAB_CONFIG:{"pmax_ma_type":"EMA","entry_type":"Donc+Chikou",...}&#10;&#10;2. JSON brut:&#10;{"pmax_ma_type":"EMA","pmax_length":10,"entry_type":"Donc+Chikou",...}&#10;&#10;3. Webhook:&#10;{"action":"buy","config":{"entry_type":"Fractal",...}}'></textarea>
+                        <div style="display:flex; gap:0.6rem; margin-top:0.5rem; flex-wrap:wrap;">
+                            <button type="button" onclick="parseTvSettings()" style="background:var(--orange); color:var(--bg-dark); font-size:0.82rem; padding:0.4rem 1rem; border:none; border-radius:4px; cursor:pointer; font-weight:600;">
+                                Extraire la config et charger
+                            </button>
+                        </div>
+                        <div id="tv-parse-result" style="display:none; margin-top:0.8rem;">
+                            <div id="tv-parse-status" style="font-size:0.82rem; margin-bottom:0.4rem;"></div>
+                            <div id="tv-alert-info" style="display:none; background:var(--bg-dark); padding:0.5rem; border-radius:4px; margin-bottom:0.4rem; font-size:0.78rem; color:var(--text-muted);"></div>
+                            <textarea id="tv-parsed-json" rows="6" readonly style="width:100%; font-family:monospace; font-size:0.75rem; background:var(--bg-dark); color:var(--green); border:1px solid var(--border); border-radius:4px; padding:0.5rem;"></textarea>
+                            <div style="display:flex; gap:0.6rem; margin-top:0.3rem;">
+                                <button type="button" onclick="copyTvJson()" style="background:var(--accent); color:var(--bg-dark); font-size:0.78rem; padding:0.3rem 0.8rem; border:none; border-radius:4px; cursor:pointer;">
+                                    Copier le JSON
+                                </button>
+                                <button type="button" onclick="loadTvJsonIntoForm()" style="background:var(--green); font-size:0.78rem; padding:0.3rem 0.8rem; border:none; border-radius:4px; cursor:pointer;">
+                                    Charger dans le formulaire
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Setup: PineScript patch -->
+                    <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:6px; padding:1rem; margin-bottom:1rem;">
+                        <h4 style="color:var(--green); margin-bottom:0.5rem; cursor:pointer;" onclick="toggleSetupSection()">
+                            <span id="setup-toggle-icon">+</span> Configuration initiale (une seule fois)
+                        </h4>
+                        <div id="setup-section" style="display:none;">
+                            <p style="color:var(--text-muted); font-size:0.78rem; margin-bottom:0.5rem;">
+                                Ajoutez ce code a votre PF_Algo pour que <strong>chaque alerte contienne automatiquement la config JSON</strong>.<br>
+                                Pas besoin de copier manuellement depuis une table !
+                            </p>
+                            <div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-bottom:0.5rem;">
+                                <button type="button" onclick="loadPineCode()" style="background:var(--green); color:var(--bg-dark); font-size:0.82rem; padding:0.4rem 1rem; border:none; border-radius:4px; cursor:pointer;">
+                                    Afficher le code PineScript
+                                </button>
+                                <button type="button" id="btn-copy-pine" onclick="copyPineCode()" style="display:none; background:var(--accent); color:var(--bg-dark); font-size:0.82rem; padding:0.4rem 1rem; border:none; border-radius:4px; cursor:pointer;">
+                                    Copier le code
+                                </button>
+                            </div>
+                            <div id="pine-code-block" style="display:none; margin-top:0.5rem;">
+                                <pre id="pine-code-content" style="background:var(--bg-dark); color:var(--green); padding:0.8rem; border-radius:4px; font-size:0.72rem; max-height:300px; overflow-y:auto; white-space:pre-wrap; border:1px solid var(--border);"></pre>
+                            </div>
+                            <div id="pine-instructions-block" style="display:none; margin-top:0.5rem;">
+                                <pre id="pine-instructions-content" style="background:var(--bg-card); color:var(--text-muted); padding:0.8rem; border-radius:4px; font-size:0.75rem; max-height:200px; overflow-y:auto; white-space:pre-wrap; border:1px solid var(--border);"></pre>
+                            </div>
+                            <div style="margin-top:0.5rem;">
+                                <p style="color:var(--text-muted); font-size:0.75rem;">
+                                    <strong>Resultat :</strong> vos alertes TradingView auront ce format :<br>
+                                    <code style="color:var(--accent); font-size:0.72rem;">6119578435797,buy,BTCUSDT,sl=42000,risk=1.0</code><br>
+                                    <code style="color:var(--green); font-size:0.72rem;">PFLAB_CONFIG:{"pmax_ma_type":"EMA","entry_type":"Donc+Chikou",...}</code><br>
+                                    Collez le texte ci-dessus et la config est extraite automatiquement.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Mapping guide (collapsed) -->
+                    <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:6px; padding:1rem; margin-bottom:1rem;">
+                        <h4 style="color:var(--text-muted); margin-bottom:0.3rem; cursor:pointer;" onclick="toggleMappingGuide()">
+                            <span id="mapping-toggle-icon">+</span> Table de mapping (Pine -> JSON)
+                        </h4>
+                        <div id="mapping-guide-container" style="display:none; margin-top:0.5rem;"></div>
+                    </div>
+
+                    <!-- Alternative: from Audit/DB -->
+                    <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:6px; padding:1rem;">
+                        <h4 style="color:var(--text-muted); margin-bottom:0.3rem;">Alternative rapide (sans modifier PineScript)</h4>
+                        <p style="color:var(--text-muted); font-size:0.78rem;">
+                            Si vous avez deja des configs en base, utilisez le bouton <strong>"Copy JSON Config"</strong>
+                            dans la page <a href="/audit" style="color:var(--accent);">Audit</a> (modal Detail)
+                            ou exportez depuis la page <a href="/database" style="color:var(--accent);">DB</a>.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ══════════════════════════════════════════════ -->
+            <!-- Section 6: Data File & Settings                -->
+            <!-- ══════════════════════════════════════════════ -->
+            <div class="card" style="border-left:3px solid var(--purple);">
+                <h3 style="color:var(--purple); margin-bottom:1rem;">Donnees &amp; Parametres</h3>
+                <div style="display:flex; gap:1rem; align-items:end; flex-wrap:wrap;">
+                    <div style="flex:1; min-width:200px;">
+                        <label class="fl">OHLCV Data File (requis)</label>
+                        <input type="file" name="ohlcv_data" accept=".csv,.xlsx,.xls" required>
+                    </div>
+                    <div>
+                        <label class="fl">Instrument</label>
+                        <select name="instrument" id="instrument-select" onchange="toggleCustomInstrument(this)">
+                            {% for group, insts in instrument_groups.items() %}
+                            <optgroup label="{{ group }}">
+                                {% for inst in insts %}
+                                <option value="{{ inst }}" {% if inst == session_instrument %}selected{% endif %}>{{ inst }}</option>
+                                {% endfor %}
+                            </optgroup>
+                            {% endfor %}
+                            <optgroup label="── Autre ──">
+                                <option value="__custom__">Instrument custom...</option>
+                            </optgroup>
+                        </select>
+                    </div>
+                    <div id="custom-instrument-block" style="display:none;">
+                        <label class="fl" style="color:var(--orange);">Nom de l'instrument</label>
+                        <input type="text" name="custom_instrument_name" id="custom_instrument_name" placeholder="ex. AAPL, TSLA, MY_STRAT" style="width:150px;">
+                    </div>
+                    <div id="custom-cost-block" style="display:none;">
+                        <label class="fl" style="color:var(--orange);">Cout de transaction <span class="tv-tag">spread</span></label>
+                        <input type="number" name="custom_transaction_cost" id="custom_transaction_cost" placeholder="ex. 0.5" step="0.001" min="0" style="width:100px;">
+                    </div>
+                    <div>
+                        <label class="fl">IS Ratio</label>
+                        <input type="number" name="is_ratio" value="0.70" min="0.50" max="0.90" step="0.05" style="width:80px;">
+                    </div>
+                </div>
+            </div>
+
+            <button type="submit" style="width:100%; font-size:1rem; padding:0.9rem;" onclick="showLoading()">
+                Lancer le Test de Robustesse
+            </button>
+        </form>
+
+        <div class="loading-overlay" id="loading-overlay">
+            <div class="spinner"></div>
+            <p style="color:var(--accent); font-weight:600;">Analyse de robustesse en cours...</p>
+            <p style="color:var(--text-muted); font-size:0.85rem;">Perturbation + Walk-Forward + OOS — 1 a 3 minutes</p>
+        </div>
+        <script>
+        // ── Custom instrument toggle ──
+        function toggleCustomInstrument(sel) {
+            const isCustom = sel.value === '__custom__';
+            document.getElementById('custom-instrument-block').style.display = isCustom ? '' : 'none';
+            document.getElementById('custom-cost-block').style.display = isCustom ? '' : 'none';
+        }
+        // ── Tab switch ──
+        function switchTab(mode) {
+            document.getElementById('input-mode').value = (mode === 'tv') ? 'json' : mode;
+            const tabForm = document.getElementById('tab-form');
+            const tabJson = document.getElementById('tab-json');
+            const tabTv   = document.getElementById('tab-tv');
+            const panelForm = document.getElementById('panel-form');
+            const panelJson = document.getElementById('panel-json');
+            const panelTv   = document.getElementById('panel-tv');
+            const active  = {background: 'var(--accent)', color: 'var(--bg-dark)', borderColor: 'var(--accent)'};
+            const inactive= {background: 'var(--bg-input)', color: 'var(--text-muted)', borderColor: 'var(--border)'};
+            function applyStyle(el, s) { el.style.background=s.background; el.style.color=s.color; el.style.borderColor=s.borderColor; }
+            applyStyle(tabForm, mode==='form' ? active : inactive);
+            applyStyle(tabJson, mode==='json' ? active : inactive);
+            applyStyle(tabTv,   mode==='tv'   ? active : inactive);
+            panelForm.style.display = mode==='form' ? 'block' : 'none';
+            panelJson.style.display = mode==='json' ? 'block' : 'none';
+            panelTv.style.display   = mode==='tv'   ? 'block' : 'none';
+        }
+        // ── Load JSON into the visual form ──
+        function loadJsonIntoForm() {
+            try {
+                const raw = document.getElementById('json-textarea').value.trim();
+                if (!raw) { alert('Le champ JSON est vide.'); return; }
+                const cfg = JSON.parse(raw);
+                const setVal = (id, val) => { const el = document.getElementById(id); if (el && val !== undefined && val !== null) el.value = String(val); };
+                const setBool = (id, val) => { const el = document.getElementById(id); if (el && val !== undefined) el.value = val ? 'true' : 'false'; };
+                // PMax
+                setVal('f-pmax_ma_type', cfg.pmax_ma_type);
+                setVal('f-pmax_length', cfg.pmax_length);
+                setVal('f-pmax_multiplier', cfg.pmax_multiplier);
+
+                // Entry
+                setVal('f-entry_type', cfg.entry_type);
+                setVal('f-order_pause', cfg.order_pause);
+                setVal('f-don_length', cfg.don_length);
+                setVal('f-rsi_div_length', cfg.rsi_div_length);
+                setVal('f-rsi_div_pivot', cfg.rsi_div_pivot);
+                setBool('f-rsi_div_hidden', cfg.rsi_div_hidden);
+                setVal('f-fractal_buffer', cfg.fractal_buffer);
+                setVal('f-length_bb_ma', cfg.length_bb_ma);
+                setVal('f-mult_bb_ma', cfg.mult_bb_ma);
+                setVal('f-length_bb_sma', cfg.length_bb_sma);
+                setVal('f-mm_cross_ma1_type', cfg.mm_cross_ma1_type);
+                setVal('f-mm_cross_ma1_len', cfg.mm_cross_ma1_len);
+                setVal('f-mm_cross_ma2_type', cfg.mm_cross_ma2_type);
+                setVal('f-mm_cross_ma2_len', cfg.mm_cross_ma2_len);
+                // (MA Cross Signal section removed — it is an entry type, not a filter)
+                // Filters
+                setBool('f-use_lt_filter', cfg.use_lt_filter);
+                setVal('f-lt_ma_type', cfg.lt_ma_type);
+                setVal('f-lt_length', cfg.lt_length);
+                setVal('f-lt_tf', cfg.lt_tf);
+                setVal('f-lt_multiplier', cfg.lt_multiplier);
+                setBool('f-use_mt_filter', cfg.use_mt_filter);
+                setVal('f-mt_ma_type', cfg.mt_ma_type);
+                setVal('f-mt_length', cfg.mt_length);
+                setVal('f-mt_tf', cfg.mt_tf);
+                setVal('f-mt_multiplier', cfg.mt_multiplier);
+                setBool('f-use_rsi50_filter', cfg.use_rsi50_filter);
+                setBool('f-use_diff_ma_red', cfg.use_diff_ma_red);
+                setVal('f-diff_ma_red_pct', cfg.diff_ma_red_pct);
+                setBool('f-use_ma_dir_filter', cfg.use_ma_dir_filter);
+                setVal('f-ma_dir_len', cfg.ma_dir_len);
+                setBool('f-use_mavg_filter', cfg.use_mavg_filter);
+                setBool('f-use_diff_price_red', cfg.use_diff_price_red);
+                setVal('f-diff_price_red_pct', cfg.diff_price_red_pct);
+                // Risk
+                setVal('f-sl_mode', cfg.sl_mode);
+                setVal('f-sl_pct', cfg.sl_pct);
+                setVal('f-atr_sl_mult', cfg.atr_sl_mult);
+                setBool('f-exit_setup_reversal', cfg.exit_setup_reversal);
+                setBool('f-long_side', cfg.long_side);
+                setBool('f-short_side', cfg.short_side);
+                // Refresh all conditional panels
+                toggleEntryParams();
+                toggleLtFilter(); toggleMtFilter(); toggleDiffMa();
+                toggleDiffPrice(); toggleMaDir(); toggleSlMode();
+                switchTab('form');
+                alert('Configuration chargee dans le formulaire !');
+            } catch (e) {
+                alert('JSON invalide: ' + e.message);
+            }
+        }
+        // ── Conditional toggles ──
+
+        function toggleEntryParams() {
+            const e = document.getElementById('f-entry_type').value;
+            document.getElementById('entry-params-donc').style.display = e === 'Donc+Chikou' ? 'block' : 'none';
+            document.getElementById('entry-params-rsi').style.display = e === 'RSI Divergence' ? 'block' : 'none';
+            document.getElementById('entry-params-fractal').style.display = e === 'Fractal' ? 'block' : 'none';
+            document.getElementById('entry-params-boll').style.display = e === 'Boll+SMA' ? 'block' : 'none';
+            document.getElementById('entry-params-mmcross').style.display = e === 'MM Cross' ? 'block' : 'none';
+        }
+        function _toggleFilterBlock(toggleId, depClass, blockId) {
+            const on = document.getElementById(toggleId).value === 'true';
+            document.querySelectorAll('.' + depClass + ' select, .' + depClass + ' input').forEach(el => el.disabled = !on);
+            if (blockId) {
+                const block = document.getElementById(blockId);
+                if (on) block.classList.remove('disabled-block');
+                else block.classList.add('disabled-block');
+            }
+        }
+        function toggleLtFilter() {
+            _toggleFilterBlock('f-use_lt_filter', 'lt-dep', 'lt-block');
+        }
+        function toggleMtFilter() {
+            _toggleFilterBlock('f-use_mt_filter', 'mt-dep', 'mt-block');
+        }
+        function toggleDiffMa() {
+            const on = document.getElementById('f-use_diff_ma_red').value === 'true';
+            document.querySelectorAll('.diffma-dep input').forEach(el => el.disabled = !on);
+        }
+        function toggleDiffPrice() {
+            const on = document.getElementById('f-use_diff_price_red').value === 'true';
+            document.querySelectorAll('.diffprice-dep input').forEach(el => el.disabled = !on);
+        }
+        function toggleMaDir() {
+            const on = document.getElementById('f-use_ma_dir_filter').value === 'true';
+            document.querySelectorAll('.madir-dep input').forEach(el => el.disabled = !on);
+        }
+        function toggleSlMode() {
+            const mode = document.getElementById('f-sl_mode').value;
+            document.getElementById('sl-static-wrap').style.display = mode === 'static_pct' ? 'block' : 'none';
+            document.getElementById('sl-atr-wrap').style.display = mode === 'atr_based' ? 'block' : 'none';
+        }
+        function showLoading() {
+            setTimeout(function() {
+                document.getElementById('loading-overlay').classList.add('active');
+            }, 200);
+        }
+        // ── Prefill from JSON if present ──
+        {% if prefill_config %}
+        document.addEventListener('DOMContentLoaded', function() {
+            try {
+                const cfg = JSON.parse({{ prefill_config | tojson }});
+                document.getElementById('json-textarea').value = {{ prefill_config | tojson }};
+                loadJsonIntoForm();
+            } catch(e) { /* ignore parse errors */ }
+        });
+        {% endif %}
+
+        // ═══════════════════════════════════════════════════════
+        // TV Settings Import Functions (Alert-based config export)
+        // ═══════════════════════════════════════════════════════
+
+        // Toggle setup section visibility
+        function toggleSetupSection() {
+            const section = document.getElementById('setup-section');
+            const icon = document.getElementById('setup-toggle-icon');
+            if (section.style.display === 'none') {
+                section.style.display = 'block'; icon.textContent = '-';
+            } else {
+                section.style.display = 'none'; icon.textContent = '+';
+            }
+        }
+
+        // Load and display the PineScript export code block
+        let _pineCodeLoaded = false;
+        async function loadPineCode() {
+            const block = document.getElementById('pine-code-block');
+            const instrBlock = document.getElementById('pine-instructions-block');
+            const btn = document.getElementById('btn-copy-pine');
+            if (block.style.display !== 'none' && _pineCodeLoaded) {
+                block.style.display = 'none'; instrBlock.style.display = 'none';
+                btn.style.display = 'none'; return;
+            }
+            block.style.display = 'block'; instrBlock.style.display = 'block';
+            btn.style.display = 'inline-block';
+            if (_pineCodeLoaded) return;
+            try {
+                const resp = await fetch('/api/pine_export_code');
+                const data = await resp.json();
+                document.getElementById('pine-code-content').textContent = data.code;
+                if (data.instructions) {
+                    document.getElementById('pine-instructions-content').textContent = data.instructions;
+                }
+                _pineCodeLoaded = true;
+            } catch(e) {
+                document.getElementById('pine-code-content').textContent = 'Erreur: ' + e.message;
+            }
+        }
+
+        function copyPineCode() {
+            const code = document.getElementById('pine-code-content').textContent;
+            navigator.clipboard.writeText(code).then(() => {
+                const btn = document.getElementById('btn-copy-pine');
+                btn.textContent = 'Copie !';
+                setTimeout(() => btn.textContent = 'Copier le code', 2000);
+            });
+        }
+
+        // Parse alert text / JSON pasted from TradingView
+        async function parseTvSettings() {
+            const text = document.getElementById('tv-settings-textarea').value.trim();
+            if (!text) { alert('Le champ est vide. Collez une alerte ou du JSON.'); return; }
+
+            try {
+                const resp = await fetch('/api/parse_tv_settings', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({text: text})
+                });
+                const data = await resp.json();
+                if (data.error) { alert('Erreur: ' + data.error); return; }
+
+                const resultDiv = document.getElementById('tv-parse-result');
+                resultDiv.style.display = 'block';
+
+                // Status line with source info
+                const statusDiv = document.getElementById('tv-parse-status');
+                const sourceLabels = {
+                    'alert': 'Alerte PineConnector + Config',
+                    'json': 'JSON brut',
+                    'webhook': 'Webhook JSON',
+                    'unknown': 'Source inconnue'
+                };
+                const sourceLabel = sourceLabels[data.source] || data.source;
+                statusDiv.innerHTML = '<span style="color:var(--green);">' +
+                    data.n_parsed + ' parametres reconnus</span>' +
+                    ' <span style="color:var(--text-muted); font-size:0.78rem;">(source: ' +
+                    sourceLabel + ')</span>';
+
+                // Show PineConnector command info if present
+                const alertInfoDiv = document.getElementById('tv-alert-info');
+                if (data.alert_command) {
+                    const cmd = data.alert_command;
+                    alertInfoDiv.style.display = 'block';
+                    alertInfoDiv.innerHTML =
+                        '<strong style="color:var(--accent);">Commande PineConnector detectee :</strong> ' +
+                        '<code>' + cmd.action.toUpperCase() + ' ' + cmd.symbol + '</code>' +
+                        (cmd.sl ? ' | SL=' + cmd.sl : '') +
+                        (cmd.tp ? ' | TP=' + cmd.tp : '') +
+                        (cmd.risk ? ' | Risk=' + cmd.risk : '');
+                } else {
+                    alertInfoDiv.style.display = 'none';
+                }
+
+                const jsonStr = JSON.stringify(data.config, null, 2);
+                document.getElementById('tv-parsed-json').value = jsonStr;
+
+                // Auto-load into form
+                document.getElementById('json-textarea').value = jsonStr;
+                loadJsonIntoForm();
+
+            } catch(e) {
+                alert('Erreur de parsing: ' + e.message);
+            }
+        }
+
+        function copyTvJson() {
+            const ta = document.getElementById('tv-parsed-json');
+            navigator.clipboard.writeText(ta.value).then(() => {
+                const btn = event.target;
+                btn.textContent = 'Copie !';
+                setTimeout(() => btn.textContent = 'Copier le JSON', 2000);
+            });
+        }
+
+        function loadTvJsonIntoForm() {
+            const jsonStr = document.getElementById('tv-parsed-json').value;
+            if (!jsonStr) { alert('Aucun JSON. Lancez d\'abord la conversion.'); return; }
+            document.getElementById('json-textarea').value = jsonStr;
+            loadJsonIntoForm();
+        }
+
+        // Mapping guide toggle with lazy-load
+        let _mappingLoaded = false;
+        async function toggleMappingGuide() {
+            const container = document.getElementById('mapping-guide-container');
+            const icon = document.getElementById('mapping-toggle-icon');
+            if (container.style.display !== 'none') {
+                container.style.display = 'none'; icon.textContent = '+'; return;
+            }
+            container.style.display = 'block'; icon.textContent = '-';
+            if (_mappingLoaded) return;
+            try {
+                const resp = await fetch('/api/tv_mapping_guide');
+                const data = await resp.json();
+                let html = '<table style="width:100%; font-size:0.72rem; border-collapse:collapse;">';
+                html += '<tr style="background:var(--bg-dark);"><th style="padding:0.3rem; text-align:left; color:var(--accent);">Section</th>';
+                html += '<th style="padding:0.3rem; text-align:left; color:var(--green);">Pine Variable</th>';
+                html += '<th style="padding:0.3rem; text-align:left; color:var(--orange);">JSON Key</th></tr>';
+                let lastSection = '';
+                for (const item of data.guide) {
+                    const showSection = item.section !== lastSection;
+                    lastSection = item.section;
+                    html += '<tr style="border-bottom:1px solid var(--border);">';
+                    html += '<td style="padding:0.2rem 0.3rem; color:var(--text-muted);">' + (showSection ? item.section : '') + '</td>';
+                    html += '<td style="padding:0.2rem 0.3rem;"><code style="color:var(--green);">' + item.pine_var + '</code></td>';
+                    html += '<td style="padding:0.2rem 0.3rem;"><code style="color:var(--orange);">' + item.json_key + '</code></td></tr>';
+                }
+                html += '</table>';
+                container.innerHTML = html;
+                _mappingLoaded = true;
+            } catch(e) {
+                container.innerHTML = '<p style="color:var(--red);">Erreur: ' + e.message + '</p>';
+            }
+        }
+        </script>
+        {% endif %}
+
+        {% if result %}
+        <!-- Overall Verdict -->
+        {% set rob = result.robustness %}
+        {% set grade = rob.grade %}
+        <div class="verdict-box verdict-{{ 'pass' if grade == 'ROBUST' else ('warn' if grade in ('ACCEPTABLE', 'MODERATE') else 'fail') }}">
+            <h2 style="font-size:2rem;">{{ grade }}</h2>
+            <p style="font-size:1.1rem; color:var(--text-muted);">
+                Robustness Score: <strong style="color:var(--text);">{{ rob.score }}/100</strong>
+            </p>
+        </div>
+
+        <!-- Tested Config Summary -->
+        <div class="card">
+            <h3 style="margin-bottom:1rem;">Configuration Testee</h3>
+            <div style="display:flex; gap:2rem; flex-wrap:wrap; font-size:0.85rem; color:var(--text-muted);">
+                <span>Instrument: <strong style="color:var(--text);">{{ result.instrument }}</strong></span>
+                <span>Entry: <strong style="color:var(--text);">{{ result.config.entry_type }}</strong></span>
+                <span>PMax: <strong style="color:var(--text);">{{ result.config.pmax_ma_type|default('EMA') }}({{ result.config.pmax_length }})&times;{{ result.config.pmax_multiplier }}</strong></span>
+                <span>SL: <strong style="color:var(--text);">{{ result.config.sl_mode }}{% if result.config.sl_mode == 'atr_based' %} (ATR&times;{{ result.config.atr_sl_mult|default(2.0) }}){% elif result.config.sl_mode == 'static_pct' %} ({{ result.config.sl_pct }}%){% endif %}</strong></span>
+                <span>IS: <strong style="color:var(--text);">{{ result.is_range.0 }}</strong> &rarr; <strong>{{ result.is_range.1 }}</strong></span>
+                <span>OOS: <strong style="color:var(--text);">{{ result.oos_range.0 }}</strong> &rarr; <strong>{{ result.oos_range.1 }}</strong></span>
+            </div>
+        </div>
+
+        <!-- IS & OOS Metrics -->
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:1.5rem;">
+            <div class="card" style="border-color:var(--accent);">
+                <h3 style="color:var(--accent); margin-bottom:1rem;">In-Sample Metrics</h3>
+                <div class="grid">
+                    <div class="stat"><div class="label">Calmar</div><div class="value" style="color:var(--accent);">{{ result.metrics_is.calmar|round(3) }}</div></div>
+                    <div class="stat"><div class="label">Profit Factor</div><div class="value">{{ result.metrics_is.profit_factor|round(3) }}</div></div>
+                    <div class="stat"><div class="label">Max DD</div><div class="value" style="color:var(--red);">{{ result.metrics_is.max_dd|round(2) }}%</div></div>
+                    <div class="stat"><div class="label">Trades</div><div class="value">{{ result.metrics_is.n_trades }}</div></div>
+                    <div class="stat"><div class="label">Win Rate</div><div class="value">{{ result.metrics_is.win_rate|round(1) }}%</div></div>
+                    <div class="stat"><div class="label">Net Return</div><div class="value" style="color:var(--green);">{{ result.metrics_is.net_return|round(2) }}%</div></div>
+                </div>
+            </div>
+            <div class="card" style="border-color:var(--green);">
+                <h3 style="color:var(--green); margin-bottom:1rem;">Out-of-Sample Metrics</h3>
+                <div class="grid">
+                    <div class="stat"><div class="label">Calmar</div><div class="value" style="color:{% if result.metrics_oos.calmar >= 0.25 %}var(--green){% else %}var(--red){% endif %};">{{ result.metrics_oos.calmar|round(3) }}</div></div>
+                    <div class="stat"><div class="label">Profit Factor</div><div class="value" style="color:{% if result.metrics_oos.profit_factor >= 1.2 %}var(--green){% else %}var(--red){% endif %};">{{ result.metrics_oos.profit_factor|round(3) }}</div></div>
+                    <div class="stat"><div class="label">Max DD</div><div class="value" style="color:var(--red);">{{ result.metrics_oos.max_dd|round(2) }}%</div></div>
+                    <div class="stat"><div class="label">Trades</div><div class="value">{{ result.metrics_oos.n_trades }}</div></div>
+                    <div class="stat"><div class="label">Win Rate</div><div class="value">{{ result.metrics_oos.win_rate|round(1) }}%</div></div>
+                    <div class="stat"><div class="label">Net Return</div><div class="value" style="color:{% if result.metrics_oos.net_return > 0 %}var(--green){% else %}var(--red){% endif %};">{{ result.metrics_oos.net_return|round(2) }}%</div></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- OOS Gate -->
+        <div class="card">
+            <h3 style="margin-bottom:1rem;">OOS Gate Check</h3>
+            <div style="display:flex; gap:1.5rem; flex-wrap:wrap; font-size:0.85rem;">
+                <span class="badge {{ 'badge-pass' if result.oos_gate.calmar else 'badge-fail' }}">Calmar &ge; 0.25: {{ 'PASS' if result.oos_gate.calmar else 'FAIL' }}</span>
+                <span class="badge {{ 'badge-pass' if result.oos_gate.pf else 'badge-fail' }}">PF &ge; 1.20: {{ 'PASS' if result.oos_gate.pf else 'FAIL' }}</span>
+                <span class="badge {{ 'badge-pass' if result.oos_gate.dd else 'badge-fail' }}">MaxDD &ge; {{ result.oos_gate.dd_limit }}%: {{ 'PASS' if result.oos_gate.dd else 'FAIL' }}</span>
+                <span class="badge {{ 'badge-pass' if result.oos_gate.trades else 'badge-fail' }}">Trades &ge; 15: {{ 'PASS' if result.oos_gate.trades else 'FAIL' }}</span>
+                <span class="badge {{ 'badge-pass' if result.oos_gate.all_pass else 'badge-fail' }}" style="font-size:0.85rem; padding:0.3rem 0.8rem;">
+                    Overall: {{ 'ALL PASS' if result.oos_gate.all_pass else 'FAIL' }}
+                </span>
+            </div>
+        </div>
+
+        <!-- WFE -->
+        <div class="card">
+            <h3 style="margin-bottom:1rem;">Walk-Forward Efficiency (WFE)</h3>
+            <div style="display:flex; gap:2rem; align-items:center; flex-wrap:wrap;">
+                <div class="stat" style="min-width:120px;">
+                    <div class="label">WFE</div>
+                    <div class="value" style="color:{% if result.wfe >= 0.5 %}var(--green){% elif result.wfe >= 0.3 %}var(--orange){% else %}var(--red){% endif %};">
+                        {{ (result.wfe * 100)|round(1) }}%
+                    </div>
+                </div>
+                <span style="font-size:0.85rem; color:var(--text-muted);">
+                    OOS Calmar / IS Calmar = {{ result.metrics_oos.calmar|round(3) }} / {{ result.metrics_is.calmar|round(3) }}
+                </span>
+            </div>
+        </div>
+
+        <!-- Perturbation -->
+        <div class="card" style="border-color:var(--purple);">
+            <h3 style="color:var(--purple); margin-bottom:1rem;">Perturbation Robustness (&plusmn;10%)</h3>
+            <div class="grid">
+                <div class="stat">
+                    <div class="label">Status</div>
+                    <div class="value">
+                        <span class="badge {{ 'badge-pass' if result.perturbation.stable else 'badge-fail' }}" style="font-size:0.9rem;">
+                            {{ 'STABLE' if result.perturbation.stable else 'FRAGILE' }}
+                        </span>
+                    </div>
+                </div>
+                <div class="stat"><div class="label">Surviving</div><div class="value">{{ result.perturbation.n_surviving }}/{{ result.perturbation.n_total }}</div></div>
+                <div class="stat"><div class="label">Degradation</div><div class="value" style="color:{% if result.perturbation.degradation < 0.3 %}var(--green){% else %}var(--red){% endif %};">{{ (result.perturbation.degradation * 100)|round(1) }}%</div></div>
+                <div class="stat"><div class="label">Base Calmar</div><div class="value">{{ result.perturbation.base_calmar|round(3) }}</div></div>
+                <div class="stat"><div class="label">Avg Perturbed</div><div class="value">{{ result.perturbation.avg_calmar|round(3) }}</div></div>
+            </div>
+        </div>
+
+        <!-- Walk-Forward -->
+        {% if result.walk_forward %}
+        <div class="card" style="border-color:var(--purple);">
+            <h3 style="color:var(--purple); margin-bottom:1rem;">Walk-Forward Analysis ({{ result.walk_forward.n_windows }} windows)</h3>
+            <div class="grid" style="margin-bottom:1rem;">
+                <div class="stat">
+                    <div class="label">Stability Score</div>
+                    <div class="value" style="color:{% if result.walk_forward.stability_score >= 70 %}var(--green){% elif result.walk_forward.stability_score >= 40 %}var(--orange){% else %}var(--red){% endif %};">
+                        {{ result.walk_forward.stability_score|round(0)|int }}/100
+                    </div>
+                    <div class="wf-gauge">
+                        <div class="wf-gauge-fill" style="width:{{ result.walk_forward.stability_score }}%;
+                            background:{% if result.walk_forward.stability_score >= 70 %}var(--green){% elif result.walk_forward.stability_score >= 40 %}var(--orange){% else %}var(--red){% endif %};"></div>
+                    </div>
+                </div>
+                <div class="stat"><div class="label">Consistency</div><div class="value">{{ result.walk_forward.consistency|round(0)|int }}%</div></div>
+                <div class="stat"><div class="label">Avg OOS Calmar</div><div class="value" style="color:var(--accent);">{{ result.walk_forward.avg_calmar|round(3) }}</div></div>
+                <div class="stat"><div class="label">Avg OOS PF</div><div class="value">{{ result.walk_forward.avg_pf|round(3) }}</div></div>
+                <div class="stat">
+                    <div class="label">Degradation</div>
+                    <div class="value" style="color:{% if result.walk_forward.degradation %}var(--red){% else %}var(--green){% endif %};">
+                        {% if result.walk_forward.degradation %}YES{% else %}NO{% endif %}
+                    </div>
+                </div>
+            </div>
+
+            {% if result.walk_forward.windows %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>Window</th><th>Period</th><th>Bars</th>
+                        <th>OOS Trades</th><th>OOS Calmar</th><th>OOS PF</th><th>OOS MaxDD</th><th>OOS WR</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for w in result.walk_forward.windows %}
+                    <tr>
+                        <td><strong>#{{ w.window }}</strong></td>
+                        <td style="font-size:0.8rem;">{{ w.start }} - {{ w.end }}</td>
+                        <td>{{ w.n_bars }}</td>
+                        <td>{{ w.oos_trades }}</td>
+                        <td style="color:{% if w.oos_calmar > 0.5 %}var(--green){% elif w.oos_calmar > 0 %}var(--orange){% else %}var(--red){% endif %}">{{ w.oos_calmar }}</td>
+                        <td style="color:{% if w.oos_pf > 1 %}var(--green){% else %}var(--red){% endif %}">{{ w.oos_pf }}</td>
+                        <td style="color:var(--red);">{{ w.oos_dd }}%</td>
+                        <td>{{ w.oos_wr }}%</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        <!-- Full Report -->
+        <div class="card" style="border-color:var(--accent);">
+            <h3 style="margin-bottom:1rem;">Summary Report</h3>
+            <pre style="color:var(--text-muted); font-size:0.85rem; line-height:1.6; overflow-x:auto; white-space:pre-wrap;">INSTRUMENT: {{ result.instrument }}
+ENTRY:      {{ result.config.entry_type }}
+PMax:       {{ result.config.pmax_ma_type|default('EMA') }}({{ result.config.pmax_length }}) x{{ result.config.pmax_multiplier }}
+SL:         {{ result.config.sl_mode }}{% if result.config.sl_mode == 'atr_based' %} (ATR x{{ result.config.atr_sl_mult|default(2.0) }}){% elif result.config.sl_mode == 'static_pct' %} ({{ result.config.sl_pct }}%){% endif %}
+
+IN-SAMPLE:  {{ result.is_range.0 }} -> {{ result.is_range.1 }}
+  Calmar: {{ result.metrics_is.calmar|round(3) }} | PF: {{ result.metrics_is.profit_factor|round(3) }} | DD: {{ result.metrics_is.max_dd|round(2) }}% | Trades: {{ result.metrics_is.n_trades }}
+
+OUT-OF-SAMPLE: {{ result.oos_range.0 }} -> {{ result.oos_range.1 }}
+  Calmar: {{ result.metrics_oos.calmar|round(3) }} | PF: {{ result.metrics_oos.profit_factor|round(3) }} | DD: {{ result.metrics_oos.max_dd|round(2) }}% | Trades: {{ result.metrics_oos.n_trades }}
+
+OOS GATE:  {{ 'ALL PASS' if result.oos_gate.all_pass else 'FAIL' }}
+WFE:       {{ (result.wfe * 100)|round(1) }}%
+
+PERTURBATION (+-10%):
+  Status: {{ 'STABLE' if result.perturbation.stable else 'FRAGILE' }}
+  Surviving: {{ result.perturbation.n_surviving }}/{{ result.perturbation.n_total }}
+  Degradation: {{ (result.perturbation.degradation * 100)|round(1) }}%
+{% if result.walk_forward %}
+WALK-FORWARD ({{ result.walk_forward.n_windows }} windows):
+  Stability:   {{ result.walk_forward.stability_score|round(0)|int }}/100
+  Consistency:  {{ result.walk_forward.consistency|round(0)|int }}%
+  Avg Calmar:  {{ result.walk_forward.avg_calmar|round(3) }}
+  Degradation: {% if result.walk_forward.degradation %}YES{% else %}NO{% endif %}
+{% endif %}
+GRADE: {{ rob.grade }} ({{ rob.score }}/100)
+            </pre>
+        </div>
+
+        <div style="text-align:center; margin:1.5rem 0;">
+            <a href="/test" style="color:var(--accent); text-decoration:none; font-weight:600; font-size:0.9rem;">&larr; Tester une Autre Configuration</a>
+        </div>
+        {% endif %}
+    </div>
+    <div style="position:fixed;bottom:6px;right:12px;font-size:0.65rem;color:#3a506b;letter-spacing:0.5px;pointer-events:none;z-index:9999;">{{ build_number }}</div>
+</body>
+</html>
