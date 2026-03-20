@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PF AI Lab 6.0.3 - Portfolio</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+    <script src="https://cdn.jsdelivr.net/npm/plotly.js@2.35.0/dist/plotly.min.js" defer></script>
+    <style>
+        :root { --bg-dark: #0a1628; --bg-card: #0f2035; --bg-input: #162a42; --border: #1e3a5f; --text: #e8edf4; --text-muted: #8ba3be; --accent: #00C8C8; --accent-hover: #00B4D8; --navy: #004C8C; --green: #00D084; --red: #f85149; --orange: #f0a030; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg-dark); color: var(--text); }
+        nav { background: var(--bg-card); border-bottom: 1px solid var(--border); padding: 0 2rem; display: flex; align-items: center; height: 60px; }
+        nav .logo { font-size: 1.3rem; font-weight: 700; color: #e8edf4; margin-right: 2rem; letter-spacing: 0.5px; }
+        nav .logo .brand { color: var(--accent); }
+        nav .logo span { color: var(--green); }
+        nav a { color: var(--text-muted); text-decoration: none; padding: 0.5rem 1rem; border-radius: 6px; margin: 0 0.2rem; font-size: 0.9rem; }
+        nav a:hover, nav a.active { color: var(--text); background: var(--bg-input); }
+        .container { max-width: 1200px; margin: 0 auto; padding: 2rem; }
+        h1 { font-size: 1.8rem; margin-bottom: 1.5rem; }
+        .card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; margin-bottom: 1.5rem; }
+        input, select, button { background: var(--bg-input); border: 1px solid var(--border); color: var(--text); padding: 0.5rem 1rem; border-radius: 6px; font-size: 0.9rem; }
+        button { cursor: pointer; background: var(--accent); color: var(--bg-dark); font-weight: 600; border: none; padding: 0.7rem 1.5rem; transition: all 0.2s; }
+        button:hover { background: var(--accent-hover); box-shadow: 0 2px 12px rgba(0, 200, 200, 0.3); }
+        .error { background: rgba(248, 81, 73, 0.1); border: 1px solid var(--red); padding: 1rem; border-radius: 6px; margin: 1rem 0; white-space: pre-wrap; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; }
+        .stat { padding: 1rem; background: var(--bg-input); border-radius: 6px; }
+        .stat .label { color: var(--text-muted); font-size: 0.8rem; margin-bottom: 0.3rem; }
+        .stat .value { font-size: 1.5rem; font-weight: 700; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+        th, td { padding: 0.6rem 0.8rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { color: var(--text-muted); font-weight: 600; background: var(--bg-card); }
+        tr:hover { background: var(--bg-input); }
+        .warning { background: rgba(210,153,34,0.1); border: 1px solid var(--orange); padding: 0.8rem; border-radius: 6px; margin: 1rem 0; font-size: 0.85rem; color: var(--orange); }
+    </style>
+</head>
+<body>
+    <nav>
+        <div class="logo"><span class="brand">PF AI Lab</span> <span>{{ app_version }}</span></div>
+        <a href="/">Home</a>
+        <a href="/data">1. Data</a>
+        <a href="/explore">2. Explore</a>
+        <a href="/test">3. Test</a>
+        <a href="/validate">4. Validate</a>
+        <a href="/portfolio" class="active">5. Portfolio</a>
+        <a href="/best">Best Configs</a>
+        <a href="/audit">Audit</a>
+        <a href="/database">DB</a>
+    </nav>
+
+    <div class="container">
+        <h1>Step 4: Portfolio Analysis</h1>
+        <p style="color:var(--text-muted); margin-bottom:1.5rem;">
+            Upload multiple TradingView trade exports to analyze cross-instrument correlations and combined performance.
+        </p>
+
+        {% if error %}
+        <div class="error">{{ error }}</div>
+        {% endif %}
+
+        <form method="POST" enctype="multipart/form-data" class="card">
+            <h3 style="margin-bottom:1rem;">Upload Trade Files (1 per instrument)</h3>
+            <p style="color:var(--text-muted); font-size:0.85rem; margin-bottom:1rem;">
+                Accepts TradingView Strategy Tester exports (Excel with "List of trades" sheet, or CSV).
+                Select 2 or more files.
+            </p>
+            <input type="file" name="portfolio_files" accept=".csv,.xlsx,.xls" multiple required>
+            <br><br>
+            <button type="submit">Analyze Portfolio</button>
+        </form>
+
+        {% if portfolio %}
+
+        {% if portfolio.parse_errors %}
+        <div class="warning">
+            Parse warnings:
+            {% for e in portfolio.parse_errors %}
+            <br>- {{ e }}
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <!-- Portfolio Summary -->
+        <div class="card">
+            <h3 style="margin-bottom:1rem;">Portfolio Summary: {{ portfolio.n_instruments }} Instruments</h3>
+            <div class="grid">
+                <div class="stat">
+                    <div class="label">Instruments</div>
+                    <div class="value">{{ portfolio.n_instruments }}</div>
+                </div>
+                <div class="stat">
+                    <div class="label">Combined Return</div>
+                    <div class="value" style="color:{% if portfolio.portfolio_return >= 0 %}var(--green){% else %}var(--red){% endif %};">
+                        {{ portfolio.portfolio_return }}%
+                    </div>
+                </div>
+                <div class="stat">
+                    <div class="label">Combined Max DD</div>
+                    <div class="value" style="color:var(--red);">{{ portfolio.portfolio_max_dd }}%</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Per-Instrument Stats -->
+        <div class="card">
+            <h3 style="margin-bottom:1rem;">Per-Instrument Breakdown</h3>
+            <div style="overflow-x:auto;">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Instrument</th>
+                            <th>Trades</th>
+                            <th>Win Rate</th>
+                            <th>Total P&L (%)</th>
+                            <th>Total P&L (USD)</th>
+                            <th>Avg Trade</th>
+                            <th>Source</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for s in portfolio.instrument_stats %}
+                        <tr>
+                            <td style="color:var(--accent); font-weight:600;">{{ s.name }}</td>
+                            <td>{{ s.n_trades }}</td>
+                            <td>{{ s.win_rate }}%</td>
+                            <td style="color:{% if s.total_pnl_pct and s.total_pnl_pct >= 0 %}var(--green){% else %}var(--red){% endif %};">
+                                {{ s.total_pnl_pct if s.total_pnl_pct is not none else '—' }}{% if s.total_pnl_pct is not none %}%{% endif %}
+                            </td>
+                            <td>{{ s.total_pnl_usd if s.total_pnl_usd is not none else '—' }}</td>
+                            <td>{{ s.avg_trade }}</td>
+                            <td style="color:var(--text-muted); font-size:0.8rem;">{{ s.sheet }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Charts -->
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:1.5rem;">
+            <div class="card">
+                <h3>Correlation Matrix</h3>
+                <div id="corr-chart"></div>
+            </div>
+            <div class="card">
+                <h3>Combined Equity Curve</h3>
+                <div id="equity-chart"></div>
+            </div>
+        </div>
+
+        <script>
+        // Correlation Heatmap
+        const corrMatrix = {{ portfolio.correlation_matrix | tojson }};
+        const instruments = {{ portfolio.instruments | tojson }};
+
+        Plotly.newPlot('corr-chart', [{
+            z: corrMatrix,
+            x: instruments,
+            y: instruments,
+            type: 'heatmap',
+            colorscale: [[0, '#f85149'], [0.5, '#0f2035'], [1, '#00D084']],
+            zmin: -1, zmax: 1,
+            text: corrMatrix.map(row => row.map(v => v.toFixed(2))),
+            texttemplate: '%{text}',
+            textfont: { color: '#e8edf4', size: 11 },
+        }], {
+            paper_bgcolor: '#0f2035', plot_bgcolor: '#0f2035',
+            font: { color: '#e8edf4' },
+            margin: { l: 100, r: 20, t: 20, b: 100 },
+        }, { responsive: true });
+
+        // Equity Curves
+        const combined = {{ portfolio.combined_equity | tojson }};
+        const individual = {{ portfolio.individual_equities | tojson }};
+        const colors = ['#00C8C8', '#00D084', '#f85149', '#f0a030', '#bc8cff', '#00B4D8'];
+
+        const traces = [];
+        individual.forEach((eq, i) => {
+            traces.push({
+                y: eq, type: 'scatter', mode: 'lines',
+                name: instruments[i],
+                line: { color: colors[i % colors.length], width: 1, dash: 'dot' },
+                opacity: 0.5,
+            });
+        });
+        traces.push({
+            y: combined, type: 'scatter', mode: 'lines',
+            name: 'Combined (Equal Weight)',
+            line: { color: '#ffffff', width: 3 },
+        });
+
+        Plotly.newPlot('equity-chart', traces, {
+            paper_bgcolor: '#0f2035', plot_bgcolor: '#0f2035',
+            font: { color: '#e8edf4' },
+            xaxis: { title: 'Trade #', gridcolor: '#1e3a5f' },
+            yaxis: { title: 'Cumulative P&L (%)', gridcolor: '#1e3a5f' },
+            margin: { l: 60, r: 20, t: 20, b: 50 },
+            legend: { bgcolor: 'rgba(0,0,0,0)', font: { size: 10 } },
+        }, { responsive: true });
+        </script>
+        {% endif %}
+    </div>
+    <div style="position:fixed;bottom:6px;right:12px;font-size:0.65rem;color:#3a506b;letter-spacing:0.5px;pointer-events:none;z-index:9999;">{{ build_number }}</div>
+</body>
+</html>
