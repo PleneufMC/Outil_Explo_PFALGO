@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PF AI Lab 6.0.3 - Data Upload</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+    <script src="https://cdn.jsdelivr.net/npm/plotly.js@2.35.0/dist/plotly.min.js" defer></script>
+    <style>
+        :root { --bg-dark: #0a1628; --bg-card: #0f2035; --bg-input: #162a42; --border: #1e3a5f; --text: #e8edf4; --text-muted: #8ba3be; --accent: #00C8C8; --accent-hover: #00B4D8; --navy: #004C8C; --green: #00D084; --red: #f85149; --orange: #f0a030; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg-dark); color: var(--text); }
+        nav { background: var(--bg-card); border-bottom: 1px solid var(--border); padding: 0 2rem; display: flex; align-items: center; height: 60px; }
+        nav .logo { font-size: 1.3rem; font-weight: 700; color: #e8edf4; margin-right: 2rem; letter-spacing: 0.5px; }
+        nav .logo .brand { color: var(--accent); }
+        nav .logo span { color: var(--green); }
+        nav a { color: var(--text-muted); text-decoration: none; padding: 0.5rem 1rem; border-radius: 6px; margin: 0 0.2rem; font-size: 0.9rem; }
+        nav a:hover, nav a.active { color: var(--text); background: var(--bg-input); }
+        .container { max-width: 1200px; margin: 0 auto; padding: 2rem; }
+        h1 { font-size: 1.8rem; margin-bottom: 1.5rem; }
+        .card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; margin-bottom: 1.5rem; }
+        .upload-zone { border: 2px dashed var(--border); border-radius: 8px; padding: 3rem; text-align: center; margin: 1rem 0; cursor: pointer; transition: border-color 0.3s; }
+        .upload-zone:hover { border-color: var(--accent); }
+        .upload-zone input[type="file"] { display: none; }
+        .upload-zone label { cursor: pointer; display: block; }
+        .upload-zone .icon { font-size: 3rem; margin-bottom: 1rem; }
+        input, select, button { background: var(--bg-input); border: 1px solid var(--border); color: var(--text); padding: 0.5rem 1rem; border-radius: 6px; font-size: 0.9rem; }
+        button { cursor: pointer; background: var(--accent); color: var(--bg-dark); font-weight: 600; border: none; padding: 0.7rem 1.5rem; transition: all 0.2s; }
+        button:hover { background: var(--accent-hover); box-shadow: 0 2px 12px rgba(0, 200, 200, 0.3); }
+        .error { background: rgba(248, 81, 73, 0.1); border: 1px solid var(--red); padding: 1rem; border-radius: 6px; margin: 1rem 0; }
+        .success { background: rgba(63, 185, 80, 0.1); border: 1px solid var(--green); padding: 1rem; border-radius: 6px; margin: 1rem 0; }
+        table { width: 100%; border-collapse: collapse; margin-top: 1rem; font-size: 0.85rem; }
+        th, td { padding: 0.5rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { color: var(--text-muted); font-weight: 600; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+        .stat { padding: 0.5rem; }
+        .stat .label { color: var(--text-muted); font-size: 0.8rem; }
+        .stat .value { font-size: 1.3rem; font-weight: 700; color: var(--accent); }
+        /* Loading overlay */
+        #loading-overlay { display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(10,22,40,0.85); z-index:9999; justify-content:center; align-items:center; flex-direction:column; gap:1rem; }
+        #loading-overlay.active { display:flex; }
+        #loading-overlay .spinner { width:40px; height:40px; border:3px solid var(--border); border-top:3px solid var(--accent); border-radius:50%; animation:spin 0.8s linear infinite; }
+        @keyframes spin { to { transform:rotate(360deg); } }
+        #loading-overlay .text { color:var(--text); font-size:0.95rem; font-weight:600; }
+        #loading-overlay .sub { color:var(--text-muted); font-size:0.8rem; }
+    </style>
+</head>
+<body>
+    <nav>
+        <div class="logo"><span class="brand">PF AI Lab</span> <span>{{ app_version }}</span></div>
+        <a href="/">Home</a>
+        <a href="/data" class="active">1. Data</a>
+        <a href="/explore">2. Explore</a>
+        <a href="/test">3. Test</a>
+        <a href="/validate">4. Validate</a>
+        <a href="/portfolio">5. Portfolio</a>
+        <a href="/best">Best Configs</a>
+        <a href="/audit">Audit</a>
+        <a href="/database">DB</a>
+    </nav>
+
+    <div class="container">
+        <h1>Step 1: Upload Data</h1>
+
+        {% if error %}
+        <div class="error">{{ error }}</div>
+        {% endif %}
+
+        <form method="POST" enctype="multipart/form-data" class="card">
+            <div class="upload-zone" onclick="document.getElementById('fileInput').click()">
+                <div class="icon">📁</div>
+                <label for="fileInput">
+                    <strong>Click to upload</strong> or drag and drop<br>
+                    <span style="color: var(--text-muted); font-size: 0.85rem;">
+                        Supports: TradingView CSV, MT5 CSV (tab/semicolon), Excel XLSX
+                    </span>
+                </label>
+                <input type="file" id="fileInput" name="datafile" accept=".csv,.xlsx,.xls,.txt"
+                       onchange="document.getElementById('filename').textContent = this.files[0]?.name || ''">
+            </div>
+            <p id="filename" style="color: var(--green); margin: 0.5rem 0;"></p>
+            <button type="submit">Upload & Preview</button>
+        </form>
+
+        {% if preview %}
+        <div class="success">
+            Data loaded successfully: <strong>{{ preview.filename }}</strong>
+            ({{ preview.source_type }})
+        </div>
+
+        <div class="card">
+            <h3 style="margin-bottom: 1rem;">Data Summary</h3>
+            <div class="grid">
+                <div class="stat"><div class="label">Total Bars</div><div class="value">{{ preview.n_bars | default(0) }}</div></div>
+                <div class="stat"><div class="label">Source</div><div class="value" style="font-size:1rem;">{{ preview.source_type }}</div></div>
+                <div class="stat"><div class="label">Start Date</div><div class="value" style="font-size:0.9rem;">{{ preview.date_start }}</div></div>
+                <div class="stat"><div class="label">End Date</div><div class="value" style="font-size:0.9rem;">{{ preview.date_end }}</div></div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3 style="margin-bottom: 1rem;">Preview (first 10 bars)</h3>
+            <div style="overflow-x: auto;">
+            <table>
+                <thead>
+                    <tr>{% for col in preview.columns %}<th>{{ col }}</th>{% endfor %}</tr>
+                </thead>
+                <tbody>
+                    {% for row in preview.head %}
+                    <tr>{% for col in preview.columns %}<td>{{ row.get(col, '') }}</td>{% endfor %}</tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3 style="margin-bottom: 1rem;">OHLC Chart (last 100 bars)</h3>
+            <div id="ohlc-chart" style="width:100%; height:400px;"></div>
+            <script>
+            const ohlcData = {{ preview.ohlc_sample | tojson }};
+            const times = ohlcData.map(d => d.DateTime || d.time || '');
+            const opens = ohlcData.map(d => d.Open);
+            const highs = ohlcData.map(d => d.High);
+            const lows = ohlcData.map(d => d.Low);
+            const closes = ohlcData.map(d => d.Close);
+
+            Plotly.newPlot('ohlc-chart', [{
+                x: times, open: opens, high: highs, low: lows, close: closes,
+                type: 'candlestick',
+                increasing: { line: { color: '#00D084' }, fillcolor: '#00D084' },
+                decreasing: { line: { color: '#f85149' }, fillcolor: '#f85149' },
+            }], {
+                paper_bgcolor: '#0f2035', plot_bgcolor: '#0f2035',
+                font: { color: '#e8edf4', size: 11 },
+                xaxis: { gridcolor: '#1e3a5f', rangeslider: { visible: false } },
+                yaxis: { gridcolor: '#1e3a5f', title: 'Price' },
+                margin: { l: 60, r: 20, t: 10, b: 40 },
+            }, { responsive: true });
+            </script>
+        </div>
+
+        <div class="card" style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:1rem;">
+            <div>
+                <h3 style="margin-bottom:0.3rem;">✅ Data Ready</h3>
+                <p style="color:var(--text-muted); font-size:0.85rem;">
+                    {{ preview.n_bars }} bars loaded — continue to <strong>Step 2</strong> to select instrument,
+                    signals, and launch the exploration.
+                </p>
+            </div>
+            <a href="/explore" style="display:inline-flex; align-items:center; gap:0.5rem; background:var(--accent); color:var(--bg-dark); font-weight:700; padding:0.8rem 1.8rem; border-radius:8px; text-decoration:none; font-size:0.95rem; transition:all 0.2s;">
+                Go to Step 2: Explore →
+            </a>
+        </div>
+        {% endif %}
+    </div>
+    <!-- Loading overlay for data upload -->
+    <div id="loading-overlay">
+        <div class="spinner"></div>
+        <div class="text">Loading data...</div>
+        <div class="sub">Parsing and validating your dataset</div>
+    </div>
+    <script>
+    // Show loading overlay when uploading data
+    document.querySelectorAll('form').forEach(form => {
+        form.addEventListener('submit', function(e) {
+            const overlay = document.getElementById('loading-overlay');
+            if (!overlay) return;
+            overlay.querySelector('.text').textContent = 'Loading data...';
+            overlay.querySelector('.sub').textContent = 'Parsing and validating your dataset';
+            overlay.classList.add('active');
+        });
+    });
+    </script>
+    <div style="position:fixed;bottom:6px;right:12px;font-size:0.65rem;color:#3a506b;letter-spacing:0.5px;pointer-events:none;z-index:9999;">{{ build_number }}</div>
+</body>
+</html>

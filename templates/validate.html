@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PF AI Lab 6.0.3 - Validate</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+    <script src="https://cdn.jsdelivr.net/npm/plotly.js@2.35.0/dist/plotly.min.js" defer></script>
+    <style>
+        :root { --bg-dark: #0a1628; --bg-card: #0f2035; --bg-input: #162a42; --border: #1e3a5f; --text: #e8edf4; --text-muted: #8ba3be; --accent: #00C8C8; --accent-hover: #00B4D8; --navy: #004C8C; --green: #00D084; --red: #f85149; --orange: #f0a030; --purple: #bc8cff; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg-dark); color: var(--text); }
+        nav { background: var(--bg-card); border-bottom: 1px solid var(--border); padding: 0 2rem; display: flex; align-items: center; height: 60px; }
+        nav .logo { font-size: 1.3rem; font-weight: 700; color: #e8edf4; margin-right: 2rem; letter-spacing: 0.5px; }
+        nav .logo .brand { color: var(--accent); }
+        nav .logo span { color: var(--green); }
+        nav a { color: var(--text-muted); text-decoration: none; padding: 0.5rem 1rem; border-radius: 6px; margin: 0 0.2rem; font-size: 0.9rem; }
+        nav a:hover, nav a.active { color: var(--text); background: var(--bg-input); }
+        .container { max-width: 1200px; margin: 0 auto; padding: 2rem; }
+        h1 { font-size: 1.8rem; margin-bottom: 1.5rem; }
+        .card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; margin-bottom: 1.5rem; }
+        input, select, button, textarea { background: var(--bg-input); border: 1px solid var(--border); color: var(--text); padding: 0.5rem 1rem; border-radius: 6px; font-size: 0.9rem; }
+        button { cursor: pointer; background: var(--accent); color: var(--bg-dark); font-weight: 600; border: none; padding: 0.7rem 1.5rem; transition: all 0.2s; }
+        button:hover { background: var(--accent-hover); box-shadow: 0 2px 12px rgba(0, 200, 200, 0.3); }
+        .error { background: rgba(248, 81, 73, 0.1); border: 1px solid var(--red); padding: 1rem; border-radius: 6px; margin: 1rem 0; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; }
+        .stat { padding: 1rem; background: var(--bg-input); border-radius: 6px; }
+        .stat .label { color: var(--text-muted); font-size: 0.8rem; margin-bottom: 0.3rem; }
+        .stat .value { font-size: 1.5rem; font-weight: 700; }
+        .verdict-box { padding: 1.5rem; border-radius: 8px; text-align: center; margin: 1.5rem 0; }
+        .verdict-deploy { background: rgba(0,208,132,0.1); border: 2px solid var(--green); }
+        .verdict-monitor { background: rgba(240,160,48,0.1); border: 2px solid var(--orange); }
+        .verdict-reject { background: rgba(248,81,73,0.1); border: 2px solid var(--red); }
+        .verdict-box h2 { font-size: 1.8rem; margin-bottom: 0.5rem; }
+        .collapsible-header { cursor: pointer; display: flex; align-items: center; justify-content: space-between; }
+        .collapsible-header:hover { opacity: 0.8; }
+        .collapsible-body { display: none; margin-top: 1rem; }
+        .collapsible-body.open { display: block; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+        th, td { padding: 0.5rem 0.7rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { color: var(--text-muted); font-weight: 600; }
+        .badge { display: inline-block; padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.75rem; font-weight: 600; }
+        .badge-pass { background: rgba(0,208,132,0.15); color: var(--green); }
+        .badge-fail { background: rgba(248,81,73,0.15); color: var(--red); }
+        .badge-warn { background: rgba(240,160,48,0.15); color: var(--orange); }
+        .wf-gauge { width: 120px; height: 8px; background: var(--bg-dark); border-radius: 4px; overflow: hidden; display: inline-block; vertical-align: middle; margin-left: 0.5rem; }
+        .wf-gauge-fill { height: 100%; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <nav>
+        <div class="logo"><span class="brand">PF AI Lab</span> <span>{{ app_version }}</span></div>
+        <a href="/">Home</a>
+        <a href="/data">1. Data</a>
+        <a href="/explore">2. Explore</a>
+        <a href="/test">3. Test</a>
+        <a href="/validate" class="active">4. Validate</a>
+        <a href="/portfolio">5. Portfolio</a>
+        <a href="/best">Best Configs</a>
+        <a href="/audit">Audit</a>
+        <a href="/database">DB</a>
+    </nav>
+
+    <div class="container">
+        <h1>Step 3: Post-TV Validation</h1>
+        <p style="color:var(--text-muted); margin-bottom:1.5rem;">
+            Upload the Strategy Tester export (Excel/CSV) from TradingView to run Monte Carlo validation
+            and optionally Walk-Forward analysis.
+        </p>
+
+        {% if error %}
+        <div class="error">{{ error }}</div>
+        {% endif %}
+
+        <form method="POST" enctype="multipart/form-data">
+            <!-- Monte Carlo section -->
+            <div class="card">
+                <h3 style="margin-bottom:1rem;">Monte Carlo Validation</h3>
+                <div style="display: flex; gap: 1rem; align-items: end; flex-wrap: wrap;">
+                    <div>
+                        <label style="display:block; color:var(--text-muted); font-size:0.85rem; margin-bottom:0.3rem;">Trade Export File (required)</label>
+                        <input type="file" name="tv_export" accept=".csv,.xlsx,.xls" required>
+                    </div>
+                    <div>
+                        <label style="display:block; color:var(--text-muted); font-size:0.85rem; margin-bottom:0.3rem;">MC Simulations</label>
+                        <input type="number" name="mc_sims" value="10000" min="1000" max="100000" style="width:120px;">
+                    </div>
+                    <div>
+                        <label style="display:block; color:var(--text-muted); font-size:0.85rem; margin-bottom:0.3rem;">Ruin Threshold (%)</label>
+                        <input type="number" name="ruin_threshold" value="-20" min="-50" max="-5" style="width:80px;">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Walk-Forward section (optional) -->
+            <div class="card">
+                <div class="collapsible-header" onclick="toggleWF()">
+                    <h3>Walk-Forward Analysis <span style="color:var(--text-muted); font-size:0.85rem; font-weight:400;">(optional — requires OHLCV data + config)</span></h3>
+                    <span id="wf-toggle-icon" style="font-size:1.2rem; color:var(--text-muted);">+</span>
+                </div>
+                <div id="wf-section" class="collapsible-body">
+                    <p style="color:var(--text-muted); font-size:0.85rem; margin-bottom:1rem;">
+                        To run Walk-Forward, upload the same OHLCV data file used for exploration and paste the strategy config JSON
+                        (from Explore results). This tests the strategy's stability across 5 sliding time windows.
+                    </p>
+                    <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+                        <div style="flex:1; min-width:200px;">
+                            <label style="display:block; color:var(--text-muted); font-size:0.85rem; margin-bottom:0.3rem;">OHLCV Data File</label>
+                            <input type="file" name="ohlcv_data" accept=".csv,.xlsx,.xls">
+                        </div>
+                        <div>
+                            <label style="display:block; color:var(--text-muted); font-size:0.85rem; margin-bottom:0.3rem;">Instrument</label>
+                            <select name="instrument">
+                                {% for group, insts in (instrument_groups|default({})).items() %}
+                                <optgroup label="{{ group }}">
+                                    {% for inst in insts %}
+                                    <option value="{{ inst }}">{{ inst }}</option>
+                                    {% endfor %}
+                                </optgroup>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    <div style="margin-top:1rem;">
+                        <label style="display:block; color:var(--text-muted); font-size:0.85rem; margin-bottom:0.3rem;">Strategy Config (JSON from Explore)</label>
+                        <textarea name="config_json" rows="6" style="width:100%; font-family:monospace; font-size:0.8rem;"
+                                  placeholder='{"entry_type": "Donc+Chikou", "pmax_length": 15, "pmax_multiplier": 3.5, ...}'></textarea>
+                    </div>
+                </div>
+            </div>
+
+            <button type="submit" style="width:100%;">Run Validation (MC + WF)</button>
+        </form>
+
+        {% if validation %}
+        <!-- Combined Verdict -->
+        {% set v = validation.verdict %}
+        <div class="verdict-box verdict-{{ v.verdict|lower }}">
+            <h2>
+                {% if v.verdict == 'DEPLOY' %}DEPLOY{% elif v.verdict == 'MONITOR' %}MONITOR{% else %}REJECT{% endif %}
+            </h2>
+            <p style="font-size:1.1rem;">
+                {{ v.classification }}
+                — Confidence: {{ v.confidence }}%
+                {% if v.has_wf %} | WF Score: {{ v.wf_score|default(0)|round(0)|int }}/100{% endif %}
+            </p>
+            <p style="color:var(--text-muted); margin-top:0.5rem; text-align:left; display:inline-block;">
+                {% for r in v.reasons %}{{ r }}<br>{% endfor %}
+            </p>
+        </div>
+
+        <!-- Parse Info -->
+        {% if validation.parse_info %}
+        <div style="color:var(--text-muted); font-size:0.8rem; margin-bottom:0.5rem; padding:0.5rem; background:var(--bg-input); border-radius:6px;">
+            Parsed from sheet "<strong>{{ validation.parse_info.sheet }}</strong>" |
+            {{ validation.parse_info.exit_rows }} exit rows out of {{ validation.parse_info.total_rows }} total |
+            P&L type: <strong>{{ validation.pnl_type|default('pct') }}</strong>
+        </div>
+        {% endif %}
+
+        <!-- Trade Stats -->
+        <div class="card">
+            <h3 style="margin-bottom:1rem;">Trade Statistics</h3>
+            <div class="grid">
+                <div class="stat"><div class="label">Total Trades</div><div class="value">{{ validation.n_trades }}</div></div>
+                <div class="stat"><div class="label">Total P&L (USD)</div><div class="value">{{ validation.trade_stats.total_pnl }}</div></div>
+                {% if validation.trade_stats.total_pnl_pct %}
+                <div class="stat"><div class="label">Total P&L (%)</div><div class="value">{{ validation.trade_stats.total_pnl_pct }}%</div></div>
+                {% endif %}
+                <div class="stat"><div class="label">Win Rate</div><div class="value">{{ validation.trade_stats.win_rate }}%</div></div>
+                <div class="stat"><div class="label">P(Ruin)</div><div class="value" style="color:{% if validation.mc.p_ruin < 5 %}var(--green){% elif validation.mc.p_ruin < 15 %}var(--orange){% else %}var(--red){% endif %}">{{ validation.mc.p_ruin }}%</div></div>
+            </div>
+        </div>
+
+        <!-- MC Results -->
+        <div class="card">
+            <h3 style="margin-bottom:1rem;">Monte Carlo Results ({{ validation.mc.n_sims|default(10000) }} simulations)</h3>
+            <div class="grid">
+                <div class="stat"><div class="label">Median MaxDD</div><div class="value">{{ validation.mc.dd_50 }}%</div></div>
+                <div class="stat"><div class="label">95th pct MaxDD</div><div class="value" style="color:var(--red);">{{ validation.mc.dd_95 }}%</div></div>
+                <div class="stat"><div class="label">99th pct MaxDD</div><div class="value" style="color:var(--red);">{{ validation.mc.dd_99 }}%</div></div>
+                <div class="stat"><div class="label">Median Return</div><div class="value" style="color:var(--green);">{{ validation.mc.return_50 }}%</div></div>
+                <div class="stat"><div class="label">5th pct Return</div><div class="value">{{ validation.mc.return_5 }}%</div></div>
+                <div class="stat"><div class="label">Median Calmar</div><div class="value" style="color:var(--accent);">{{ validation.mc.calmar_50 }}</div></div>
+            </div>
+        </div>
+
+        <!-- Walk-Forward Results -->
+        {% if validation.walk_forward %}
+        <div class="card" style="border-color:var(--purple);">
+            <h3 style="margin-bottom:1rem; color:var(--purple);">Walk-Forward Analysis ({{ validation.walk_forward.n_windows }} windows)</h3>
+            <div class="grid" style="margin-bottom:1rem;">
+                <div class="stat">
+                    <div class="label">Stability Score</div>
+                    <div class="value" style="color:{% if validation.walk_forward.stability_score >= 70 %}var(--green){% elif validation.walk_forward.stability_score >= 40 %}var(--orange){% else %}var(--red){% endif %}">
+                        {{ validation.walk_forward.stability_score }}/100
+                    </div>
+                    <div class="wf-gauge">
+                        <div class="wf-gauge-fill" style="width:{{ validation.walk_forward.stability_score }}%;
+                            background:{% if validation.walk_forward.stability_score >= 70 %}var(--green){% elif validation.walk_forward.stability_score >= 40 %}var(--orange){% else %}var(--red){% endif %};"></div>
+                    </div>
+                </div>
+                <div class="stat">
+                    <div class="label">Consistency</div>
+                    <div class="value">{{ validation.walk_forward.consistency }}%</div>
+                </div>
+                <div class="stat">
+                    <div class="label">Avg OOS Calmar</div>
+                    <div class="value" style="color:var(--accent);">{{ validation.walk_forward.avg_calmar }}</div>
+                </div>
+                <div class="stat">
+                    <div class="label">Avg OOS PF</div>
+                    <div class="value">{{ validation.walk_forward.avg_pf }}</div>
+                </div>
+                <div class="stat">
+                    <div class="label">Degradation</div>
+                    <div class="value" style="color:{% if validation.walk_forward.degradation %}var(--red){% else %}var(--green){% endif %}">
+                        {% if validation.walk_forward.degradation %}YES{% else %}NO{% endif %}
+                    </div>
+                </div>
+            </div>
+
+            {% if validation.walk_forward.windows %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>Window</th>
+                        <th>Period</th>
+                        <th>Bars</th>
+                        <th>OOS Trades</th>
+                        <th>OOS Calmar</th>
+                        <th>OOS PF</th>
+                        <th>OOS MaxDD</th>
+                        <th>OOS WR</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for w in validation.walk_forward.windows %}
+                    <tr>
+                        <td><strong>#{{ w.window }}</strong></td>
+                        <td style="font-size:0.8rem;">{{ w.start }} - {{ w.end }}</td>
+                        <td>{{ w.n_bars }}</td>
+                        <td>{{ w.oos_trades }}</td>
+                        <td style="color:{% if w.oos_calmar > 0.5 %}var(--green){% elif w.oos_calmar > 0 %}var(--orange){% else %}var(--red){% endif %}">
+                            {{ w.oos_calmar }}
+                        </td>
+                        <td style="color:{% if w.oos_pf > 1 %}var(--green){% else %}var(--red){% endif %}">
+                            {{ w.oos_pf }}
+                        </td>
+                        <td style="color:var(--red);">{{ w.oos_dd }}%</td>
+                        <td>{{ w.oos_wr }}%</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% endif %}
+        </div>
+        {% elif validation.wf_error %}
+        <div class="card" style="border-color:var(--orange);">
+            <h3 style="color:var(--orange);">Walk-Forward</h3>
+            <div class="error">{{ validation.wf_error }}</div>
+        </div>
+        {% else %}
+        <div class="card" style="border-color:var(--border); opacity:0.6;">
+            <h3 style="color:var(--text-muted);">Walk-Forward Analysis</h3>
+            <p style="color:var(--text-muted); font-size:0.85rem;">
+                Not run. To enable, expand the Walk-Forward section above and provide OHLCV data + strategy config JSON.
+            </p>
+        </div>
+        {% endif %}
+
+        <!-- Charts -->
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:1.5rem;">
+            <div class="card">
+                <h3>Max Drawdown Distribution</h3>
+                <div id="dd-chart"></div>
+            </div>
+            <div class="card">
+                <h3>Return Distribution</h3>
+                <div id="ret-chart"></div>
+            </div>
+        </div>
+
+        <!-- Decision summary -->
+        <div class="card" style="border-color:var(--accent);">
+            <h3 style="margin-bottom:1rem;">Final Report Summary</h3>
+            <pre style="color:var(--text-muted); font-size:0.85rem; line-height:1.6; overflow-x:auto; white-space:pre-wrap;">INPUT:  {{ validation.filename }}
+TRADES: {{ validation.n_trades }}
+WIN RATE: {{ validation.trade_stats.win_rate }}%
+TOTAL P&L: {{ validation.trade_stats.total_pnl }}{% if validation.trade_stats.total_pnl_pct %} ({{ validation.trade_stats.total_pnl_pct }}%){% endif %}
+
+MONTE CARLO ({{ validation.mc.n_sims|default(10000) }} sims):
+  Classification: {{ validation.mc.classification }}
+  P(ruin):  {{ validation.mc.p_ruin }}%
+  DD 95th:  {{ validation.mc.dd_95 }}%
+  DD 99th:  {{ validation.mc.dd_99 }}%
+  Return median: {{ validation.mc.return_50 }}%
+  Calmar median: {{ validation.mc.calmar_50 }}
+{% if validation.walk_forward %}
+WALK-FORWARD ({{ validation.walk_forward.n_windows }} windows):
+  Stability:   {{ validation.walk_forward.stability_score }}/100
+  Consistency:  {{ validation.walk_forward.consistency }}%
+  Avg OOS Calmar: {{ validation.walk_forward.avg_calmar }}
+  Avg OOS PF:     {{ validation.walk_forward.avg_pf }}
+  Degradation:    {% if validation.walk_forward.degradation %}YES{% else %}NO{% endif %}
+{% endif %}
+COMBINED VERDICT: {{ validation.verdict.verdict }}
+CONFIDENCE: {{ validation.verdict.confidence }}%
+{% for r in validation.verdict.reasons %}  - {{ r }}
+{% endfor %}
+NOTE: Python results are EXPLORATORY. Only TradingView is authoritative.
+MC tests trade-order risk only. WF tests temporal stability.
+Neither tests regime change, slippage, or execution quality.
+            </pre>
+        </div>
+
+        <script>
+        // DD Histogram
+        const ddBins = {{ validation.dd_histogram.bins | tojson }};
+        const ddCounts = {{ validation.dd_histogram.counts | tojson }};
+        Plotly.newPlot('dd-chart', [{
+            x: ddBins.slice(0, -1).map((b, i) => (b + ddBins[i + 1]) / 2),
+            y: ddCounts,
+            type: 'bar',
+            marker: { color: '#f85149', opacity: 0.7 },
+        }], {
+            paper_bgcolor: '#0f2035', plot_bgcolor: '#0f2035',
+            font: { color: '#e8edf4' },
+            xaxis: { title: 'Max Drawdown (%)', gridcolor: '#1e3a5f' },
+            yaxis: { title: 'Frequency', gridcolor: '#1e3a5f' },
+            margin: { l: 50, r: 20, t: 20, b: 50 },
+        }, { responsive: true });
+
+        // Return Histogram
+        const retBins = {{ validation.ret_histogram.bins | tojson }};
+        const retCounts = {{ validation.ret_histogram.counts | tojson }};
+        Plotly.newPlot('ret-chart', [{
+            x: retBins.slice(0, -1).map((b, i) => (b + retBins[i + 1]) / 2),
+            y: retCounts,
+            type: 'bar',
+            marker: { color: '#00D084', opacity: 0.7 },
+        }], {
+            paper_bgcolor: '#0f2035', plot_bgcolor: '#0f2035',
+            font: { color: '#e8edf4' },
+            xaxis: { title: 'Total Return (%)', gridcolor: '#1e3a5f' },
+            yaxis: { title: 'Frequency', gridcolor: '#1e3a5f' },
+            margin: { l: 50, r: 20, t: 20, b: 50 },
+        }, { responsive: true });
+        </script>
+        {% endif %}
+    </div>
+
+    <script>
+    function toggleWF() {
+        const section = document.getElementById('wf-section');
+        const icon = document.getElementById('wf-toggle-icon');
+        if (section.classList.contains('open')) {
+            section.classList.remove('open');
+            icon.textContent = '+';
+        } else {
+            section.classList.add('open');
+            icon.textContent = '-';
+        }
+    }
+    </script>
+    <div style="position:fixed;bottom:6px;right:12px;font-size:0.65rem;color:#3a506b;letter-spacing:0.5px;pointer-events:none;z-index:9999;">{{ build_number }}</div>
+</body>
+</html>

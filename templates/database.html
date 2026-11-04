@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PF AI Lab 6.0.3 - Backtest Database</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+    <style>
+        :root { --bg-dark: #0a1628; --bg-card: #0f2035; --bg-input: #162a42; --border: #1e3a5f; --text: #e8edf4; --text-muted: #8ba3be; --accent: #00C8C8; --accent-hover: #00B4D8; --navy: #004C8C; --green: #00D084; --red: #f85149; --orange: #f0a030; --bg-card-hover: #132940; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg-dark); color: var(--text); }
+        nav { background: var(--bg-card); border-bottom: 1px solid var(--border); padding: 0 2rem; display: flex; align-items: center; height: 60px; }
+        nav .logo { font-size: 1.3rem; font-weight: 700; color: #e8edf4; margin-right: 2rem; letter-spacing: 0.5px; }
+        nav .logo .brand { color: var(--accent); }
+        nav .logo span { color: var(--green); }
+        nav a { color: var(--text-muted); text-decoration: none; padding: 0.5rem 1rem; border-radius: 6px; margin: 0 0.2rem; font-size: 0.9rem; }
+        nav a:hover, nav a.active { color: var(--text); background: var(--bg-input); }
+        .container { max-width: 1600px; margin: 0 auto; padding: 1.5rem 2rem; }
+        h1 { font-size: 1.5rem; margin-bottom: 1rem; }
+        .card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 1rem 1.2rem; margin-bottom: 1rem; }
+        input, select, button { background: var(--bg-input); border: 1px solid var(--border); color: var(--text); padding: 0.4rem 0.8rem; border-radius: 6px; font-size: 0.82rem; }
+        button { cursor: pointer; background: var(--accent); color: var(--bg-dark); font-weight: 600; border: none; padding: 0.5rem 1rem; transition: all 0.2s; }
+        button:hover { background: var(--accent-hover); box-shadow: 0 2px 12px rgba(0, 200, 200, 0.3); }
+        button.btn-sm { padding: 0.25rem 0.5rem; font-size: 0.72rem; }
+        button.btn-green { background: var(--green); }
+        button.btn-red { background: var(--red); }
+        button.btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text-muted); }
+        button.btn-outline:hover { border-color: var(--accent); color: var(--accent); background: transparent; }
+
+        /* ── Stats bar ── */
+        .stats-row { display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem; }
+        .stat-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 0.7rem 1.2rem; min-width: 110px; flex:1; }
+        .stat-card .value { font-size: 1.5rem; font-weight: 700; color: var(--accent); }
+        .stat-card .label { font-size: 0.72rem; color: var(--text-muted); margin-top: 0.1rem; text-transform: uppercase; letter-spacing: 0.3px; }
+
+        /* ── Filters ── */
+        .filter-bar { display: flex; gap: 0.8rem; align-items: end; flex-wrap: wrap; }
+        .filter-bar label { display: block; color: var(--text-muted); font-size: 0.72rem; margin-bottom: 0.2rem; text-transform: uppercase; letter-spacing: 0.3px; }
+        .filter-bar select, .filter-bar input { font-size: 0.82rem; padding: 0.4rem 0.6rem; }
+
+        /* ── Compact config cards ── */
+        .config-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 0.8rem; }
+        .config-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 0.8rem 1rem; transition: border-color 0.2s, background 0.2s; cursor: pointer; position: relative; overflow: hidden; }
+        .config-card:hover { border-color: var(--accent); background: var(--bg-card-hover); }
+        .config-card.oos-pass { border-left: 3px solid var(--green); }
+        .config-card.oos-fail { border-left: 3px solid var(--red); }
+
+        /* Card header */
+        .cc-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; }
+        .cc-instrument { font-weight: 700; font-size: 0.9rem; color: var(--text); }
+        .cc-rank { font-size: 0.72rem; color: var(--text-muted); }
+        .cc-score { font-weight: 700; font-size: 0.82rem; color: var(--accent); }
+        .cc-date { font-size: 0.68rem; color: var(--text-muted); opacity: 0.7; }
+
+        /* Metric row */
+        .cc-metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.3rem 0.6rem; margin-bottom: 0.5rem; }
+        .cc-metric { }
+        .cc-metric .lbl { font-size: 0.62rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.3px; line-height: 1; }
+        .cc-metric .val { font-size: 0.82rem; font-weight: 600; line-height: 1.3; }
+        .cc-metric .val.positive { color: var(--green); }
+        .cc-metric .val.negative { color: var(--red); }
+        .cc-metric .val.neutral { color: var(--text); }
+        .cc-metric .val.muted { color: var(--text-muted); }
+        .cc-metric .val.accent { color: var(--accent); }
+
+        /* Badges */
+        .badge { display: inline-block; padding: 0.1rem 0.35rem; border-radius: 3px; font-size: 0.65rem; font-weight: 700; letter-spacing: 0.2px; }
+        .badge-pass { background: rgba(0,208,132,0.15); color: var(--green); }
+        .badge-fail { background: rgba(248,81,73,0.15); color: var(--red); }
+        .badge-stable { background: rgba(0,200,200,0.12); color: var(--accent); }
+        .badge-fragile { background: rgba(240,160,48,0.15); color: var(--orange); }
+
+        /* Strategy tags row */
+        .cc-tags { display: flex; gap: 0.3rem; flex-wrap: wrap; margin-bottom: 0.4rem; }
+        .cc-tag { font-size: 0.65rem; padding: 0.1rem 0.4rem; border-radius: 3px; background: var(--bg-input); color: var(--text-muted); border: 1px solid rgba(30,58,95,0.5); }
+        .cc-tag.entry { color: var(--accent); border-color: rgba(0,200,200,0.3); }
+        .cc-tag.filter-on { color: var(--green); border-color: rgba(0,208,132,0.3); }
+
+        /* Robustness row */
+        .cc-robustness { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; padding-top: 0.4rem; border-top: 1px solid rgba(30,58,95,0.4); }
+
+        /* Card actions */
+        .cc-actions { position: absolute; top: 0.5rem; right: 0.5rem; display: flex; gap: 0.3rem; opacity: 0; transition: opacity 0.2s; }
+        .config-card:hover .cc-actions { opacity: 1; }
+
+        /* IS/OOS section headers */
+        .cc-section { font-size: 0.62rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; margin-bottom: 0.15rem; margin-top: 0.2rem; }
+        .cc-section.is-label { color: var(--accent); opacity: 0.7; }
+        .cc-section.oos-label { color: var(--green); opacity: 0.7; }
+
+        /* Two-column IS/OOS layout */
+        .cc-perf { display: grid; grid-template-columns: 1fr 1fr; gap: 0 1rem; margin-bottom: 0.4rem; }
+        .cc-perf-col { }
+
+        /* ── Backup bar ── */
+        .backup-bar { display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap; padding-top: 0.6rem; margin-top: 0.6rem; border-top: 1px solid var(--border); }
+
+        /* ── View toggle ── */
+        .view-toggle { display: flex; gap: 0; }
+        .view-toggle button { border-radius: 0; border: 1px solid var(--border); background: var(--bg-input); color: var(--text-muted); padding: 0.35rem 0.7rem; font-size: 0.78rem; }
+        .view-toggle button:first-child { border-radius: 6px 0 0 6px; }
+        .view-toggle button:last-child { border-radius: 0 6px 6px 0; }
+        .view-toggle button.active { background: var(--accent); color: var(--bg-dark); border-color: var(--accent); }
+        .view-toggle button:hover:not(.active) { color: var(--accent); border-color: var(--accent); }
+
+        /* ── Table view (compact) ── */
+        .table-view { display: none; overflow-x: auto; max-height: 70vh; overflow-y: auto; }
+        .table-view table { width: 100%; border-collapse: collapse; font-size: 0.75rem; }
+        .table-view th, .table-view td { padding: 0.35rem 0.5rem; text-align: left; border-bottom: 1px solid var(--border); white-space: nowrap; }
+        .table-view th { color: var(--text-muted); font-weight: 600; position: sticky; top: 0; background: var(--bg-card); z-index: 2; cursor: pointer; user-select: none; font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.3px; }
+        .table-view th:hover { color: var(--accent); }
+        .table-view th.sorted-asc::after { content: ' \u25B2'; font-size: 0.6rem; }
+        .table-view th.sorted-desc::after { content: ' \u25BC'; font-size: 0.6rem; }
+        .table-view tr:hover { background: var(--bg-input); }
+        .table-view tr { cursor: pointer; }
+
+        /* ── Modal ── */
+        #modal { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); z-index: 1000; justify-content: center; align-items: center; }
+        #modal.active { display: flex; }
+        #modal-content { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem; max-width: 800px; width: 90%; max-height: 80vh; overflow-y: auto; position: relative; }
+        pre.tv-export { background: var(--bg-input); padding: 1rem; border-radius: 6px; font-size: 0.78rem; overflow-x: auto; white-space: pre-wrap; max-height: 400px; overflow-y: auto; line-height: 1.5; }
+
+        /* ── Empty state ── */
+        .empty-state { text-align: center; padding: 3rem; color: var(--text-muted); }
+        .empty-state .icon { font-size: 3rem; margin-bottom: 1rem; }
+
+        /* ── Results count ── */
+        .results-count { font-size: 0.78rem; color: var(--text-muted); margin-bottom: 0.5rem; }
+        .results-count strong { color: var(--accent); }
+
+        /* Scrollbar styling */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: var(--bg-dark); }
+        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+    </style>
+</head>
+<body>
+    <nav>
+        <div class="logo"><span class="brand">PF AI Lab</span> <span>{{ app_version }}</span></div>
+        <a href="/">Home</a>
+        <a href="/data">1. Data</a>
+        <a href="/explore">2. Explore</a>
+        <a href="/test">3. Test</a>
+        <a href="/validate">4. Validate</a>
+        <a href="/portfolio">5. Portfolio</a>
+        <a href="/best">Best Configs</a>
+        <a href="/audit">Audit</a>
+        <a href="/database" class="active">DB</a>
+    </nav>
+
+    <div class="container">
+        <h1>Backtest Database</h1>
+
+        <!-- Stats cards -->
+        <div class="stats-row">
+            <div class="stat-card">
+                <div class="value" id="stat-runs">{{ stats.total_runs }}</div>
+                <div class="label">Runs</div>
+            </div>
+            <div class="stat-card">
+                <div class="value" id="stat-configs">{{ stats.total_configs }}</div>
+                <div class="label">Configs</div>
+            </div>
+            <div class="stat-card">
+                <div class="value" id="stat-oos" style="color:var(--green);">{{ stats.oos_pass_count }}</div>
+                <div class="label">OOS Pass</div>
+            </div>
+            <div class="stat-card">
+                <div class="value" id="stat-instruments">{{ stats.instruments|length }}</div>
+                <div class="label">Instruments</div>
+            </div>
+            <div class="stat-card">
+                <div class="value" id="stat-instruments-list" style="font-size:0.82rem; color:var(--text-muted); line-height:1.4;">
+                    {{ stats.instruments|join(', ') if stats.instruments else '—' }}
+                </div>
+                <div class="label">In DB</div>
+            </div>
+        </div>
+
+        <!-- Filters -->
+        <div class="card">
+            <div class="filter-bar">
+                <div>
+                    <label>Instrument</label>
+                    <select id="filter-instrument" onchange="loadConfigs()">
+                        <option value="">All</option>
+                        {% for group, insts in instrument_groups.items() %}
+                        <optgroup label="{{ group }}">
+                            {% for inst in insts %}
+                            <option value="{{ inst }}">{{ inst }}</option>
+                            {% endfor %}
+                        </optgroup>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label>Run</label>
+                    <select id="filter-run" onchange="loadConfigs()" style="max-width:260px;">
+                        <option value="">All runs</option>
+                    </select>
+                </div>
+                <div>
+                    <label>OOS Gate</label>
+                    <select id="filter-oos" onchange="loadConfigs()">
+                        <option value="0">All</option>
+                        <option value="1">PASS only</option>
+                    </select>
+                </div>
+                <div>
+                    <label>Min Score</label>
+                    <input type="number" id="filter-score" value="0" min="0" step="0.1" style="width:70px;" onchange="loadConfigs()">
+                </div>
+                <div style="display:flex; gap:0.4rem; align-items: end;">
+                    <button onclick="loadConfigs()">Filter</button>
+                    <button class="btn-green btn-sm" onclick="exportCsv()">CSV</button>
+                    <button class="btn-red btn-sm" id="btn-delete-run" onclick="deleteSelectedRun()" style="display:none;" title="Supprimer ce run et toutes ses configs">Supprimer le Run</button>
+                </div>
+                <div style="margin-left:auto;">
+                    <label>View</label>
+                    <div class="view-toggle">
+                        <button id="view-cards-btn" class="active" onclick="switchView('cards')">Cards</button>
+                        <button id="view-table-btn" onclick="switchView('table')">Table</button>
+                    </div>
+                </div>
+            </div>
+            <!-- Database Backup / Restore -->
+            <div class="backup-bar">
+                <span style="color:var(--text-muted); font-size:0.72rem; font-weight:600; text-transform:uppercase; letter-spacing:0.3px;">Backup:</span>
+                <button class="btn-sm" style="background:var(--accent);" onclick="exportJsonBackup()">Export JSON</button>
+                <label style="cursor:pointer;">
+                    <button class="btn-sm btn-green" onclick="document.getElementById('import-file').click()">Import JSON</button>
+                    <input type="file" id="import-file" accept=".json" style="display:none;" onchange="importJsonBackup(this)">
+                </label>
+                <span id="backup-status" style="font-size:0.72rem; color:var(--text-muted);"></span>
+            </div>
+        </div>
+
+        <!-- Results count -->
+        <div class="results-count" id="results-count"></div>
+
+        <!-- Cards View (default) -->
+        <div id="cards-view">
+            <div class="config-grid" id="config-grid"></div>
+        </div>
+
+        <!-- Table View -->
+        <div class="table-view card" id="table-view">
+            <table id="db-table">
+                <thead>
+                    <tr>
+                        <th data-col="instrument" onclick="sortTable('instrument')">Instr.</th>
+                        <th data-col="rank" onclick="sortTable('rank')">#</th>
+                        <th data-col="score" onclick="sortTable('score')">Score</th>
+                        <th data-col="entry_type" onclick="sortTable('entry_type')">Entry</th>
+                        <th>PMax</th>
+                        <th data-col="is_calmar" onclick="sortTable('is_calmar')">IS Cal.</th>
+                        <th data-col="is_max_dd" onclick="sortTable('is_max_dd')">IS DD</th>
+                        <th data-col="is_trades" onclick="sortTable('is_trades')">IS Tr.</th>
+                        <th data-col="is_profit_factor" onclick="sortTable('is_profit_factor')">IS PF</th>
+                        <th data-col="oos_calmar" onclick="sortTable('oos_calmar')">OOS Cal.</th>
+                        <th data-col="oos_max_dd" onclick="sortTable('oos_max_dd')">OOS DD</th>
+                        <th data-col="oos_trades" onclick="sortTable('oos_trades')">OOS Tr.</th>
+                        <th data-col="oos_profit_factor" onclick="sortTable('oos_profit_factor')">OOS PF</th>
+                        <th data-col="oos_gate_pass" onclick="sortTable('oos_gate_pass')">Gate</th>
+                        <th data-col="wfe" onclick="sortTable('wfe')">WFE</th>
+                        <th data-col="perturbation_stable" onclick="sortTable('perturbation_stable')">Pert.</th>
+                        <th data-col="wf_stability" onclick="sortTable('wf_stability')">WF</th>
+                        <th data-col="run_date" onclick="sortTable('run_date')">Date</th>
+                        <th style="width:30px;"></th>
+                    </tr>
+                </thead>
+                <tbody id="db-tbody"></tbody>
+            </table>
+        </div>
+
+        <div id="empty-state" class="empty-state" style="display:none;">
+            <div class="icon">&#128202;</div>
+            <p>No backtest results yet.</p>
+            <p style="font-size:0.85rem; margin-top:0.5rem;">Run an optimization on the <a href="/explore" style="color:var(--accent);">Explore</a> page to populate the database.</p>
+        </div>
+    </div>
+
+    <!-- Detail Modal -->
+    <div id="modal" onclick="if(event.target===this)this.classList.remove('active')">
+        <div id="modal-content">
+            <button onclick="document.getElementById('modal').classList.remove('active')" style="position:absolute;top:0.8rem;right:0.8rem;background:none;border:none;color:var(--text-muted);font-size:1.5rem;cursor:pointer;padding:0.3rem;">&times;</button>
+            <h2 id="modal-title" style="font-size:1.1rem; margin-bottom:0.8rem;">Config Detail</h2>
+            <pre class="tv-export" id="modal-tv-export" style="margin:0.8rem 0;"></pre>
+            <div style="display:flex; gap:0.6rem; flex-wrap:wrap;">
+                <button onclick="copyModalText()">Copy TV Config</button>
+                <button class="btn-green" onclick="copyJsonConfig()">Copy JSON</button>
+            </div>
+            <p id="copy-feedback" style="color:var(--green); font-size:0.82rem; margin-top:0.4rem; min-height:1.2em;"></p>
+        </div>
+    </div>
+
+    <script>
+    let allConfigs = [];
+    let sortCol = 'score';
+    let sortDir = 'desc';
+    let currentView = 'cards';
+
+    // ── Helper: format number ──
+    function f(v, d=2) { return v != null ? Number(v).toFixed(d) : '—'; }
+    function fPct(v, d=1) { return v != null ? Number(v).toFixed(d) + '%' : '—'; }
+
+    // ── Helper: metric color class ──
+    function metricClass(val, goodAbove=0, badBelow=null) {
+        if (val == null) return 'muted';
+        if (val >= goodAbove) return 'positive';
+        if (badBelow != null && val < badBelow) return 'negative';
+        return 'neutral';
+    }
+
+    // ── View switch ──
+    function switchView(view) {
+        currentView = view;
+        document.getElementById('cards-view').style.display = view === 'cards' ? 'block' : 'none';
+        document.getElementById('table-view').style.display = view === 'table' ? 'block' : 'none';
+        document.getElementById('view-cards-btn').classList.toggle('active', view === 'cards');
+        document.getElementById('view-table-btn').classList.toggle('active', view === 'table');
+        renderAll();
+    }
+
+    // ── Load runs ──
+    async function loadRuns() {
+        const inst = document.getElementById('filter-instrument').value;
+        const url = inst ? `/api/db/runs?instrument=${inst}` : '/api/db/runs';
+        try {
+            const res = await fetch(url);
+            const data = await res.json();
+            const sel = document.getElementById('filter-run');
+            sel.innerHTML = '<option value="">All runs</option>';
+            (data.runs || []).forEach(r => {
+                const d = r.created_at ? r.created_at.slice(0, 16).replace('T', ' ') : '?';
+                const opt = document.createElement('option');
+                opt.value = r.id;
+                opt.textContent = `#${r.id} ${r.instrument} ${r.mode} ${d} (${r.n_configs})`;
+                sel.appendChild(opt);
+            });
+        } catch (e) { console.error('loadRuns:', e); }
+    }
+
+    // ── Load configs ──
+    async function loadConfigs() {
+        const instrument = document.getElementById('filter-instrument').value;
+        const run_id = document.getElementById('filter-run').value;
+        const oos_only = document.getElementById('filter-oos').value;
+        const min_score = document.getElementById('filter-score').value || '0';
+
+        let url = `/api/db/configs?oos_gate_only=${oos_only}&min_score=${min_score}`;
+        if (instrument) url += `&instrument=${instrument}`;
+        if (run_id) url += `&run_id=${run_id}`;
+
+        try {
+            const res = await fetch(url);
+            const data = await res.json();
+            allConfigs = data.configs || [];
+            renderAll();
+            loadRuns();
+        } catch (e) { console.error('loadConfigs:', e); }
+    }
+
+    // ── Sort configs ──
+    function getSorted() {
+        return [...allConfigs].sort((a, b) => {
+            let va = a[sortCol], vb = b[sortCol];
+            if (va == null) va = -Infinity;
+            if (vb == null) vb = -Infinity;
+            if (typeof va === 'string') return sortDir === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va);
+            return sortDir === 'asc' ? va - vb : vb - va;
+        });
+    }
+
+    // ── Render all ──
+    function renderAll() {
+        const sorted = getSorted();
+        const empty = document.getElementById('empty-state');
+        const countEl = document.getElementById('results-count');
+
+        if (allConfigs.length === 0) {
+            document.getElementById('config-grid').innerHTML = '';
+            document.getElementById('db-tbody').innerHTML = '';
+            empty.style.display = 'block';
+            countEl.textContent = '';
+            return;
+        }
+        empty.style.display = 'none';
+        countEl.innerHTML = `<strong>${allConfigs.length}</strong> configs found`;
+
+        if (currentView === 'cards') {
+            renderCards(sorted);
+        } else {
+            renderTable(sorted);
+        }
+    }
+
+    // ── Render CARDS view ──
+    function renderCards(sorted) {
+        const grid = document.getElementById('config-grid');
+        grid.innerHTML = sorted.map(c => {
+            const date = c.run_date ? c.run_date.slice(0, 10) : '';
+            const oosPass = c.oos_gate_pass;
+            const pmax = `${c.pmax_ma_type||'EMA'}(${c.pmax_length||'?'}) ×${(c.pmax_multiplier||0).toFixed(1)}`;
+
+            // Tags
+            let tags = `<span class="cc-tag entry">${c.entry_type||'—'}</span>`;
+            tags += `<span class="cc-tag">${pmax}</span>`;
+            if (c.use_lt_filter) tags += `<span class="cc-tag filter-on">LT</span>`;
+            if (c.use_mt_filter) tags += `<span class="cc-tag filter-on">MT</span>`;
+            if (c.use_rsi50_filter) tags += `<span class="cc-tag filter-on">RSI50</span>`;
+            if (c.use_diff_ma_red) tags += `<span class="cc-tag filter-on">DiffMA</span>`;
+
+            // WFE
+            const wfe = c.wfe != null ? (c.wfe * 100).toFixed(0) + '%' : '—';
+
+            // Perturbation & WF
+            let pertBadge = '—';
+            if (c.perturbation_stable != null) {
+                pertBadge = c.perturbation_stable
+                    ? '<span class="badge badge-stable">STABLE</span>'
+                    : '<span class="badge badge-fragile">FRAGILE</span>';
+            }
+            let wfBadge = '—';
+            if (c.wf_stability != null) {
+                const s = c.wf_stability;
+                wfBadge = s >= 70
+                    ? `<span class="badge badge-pass">WF ${s.toFixed(0)}</span>`
+                    : s >= 40
+                        ? `<span class="badge badge-fragile">WF ${s.toFixed(0)}</span>`
+                        : `<span class="badge badge-fail">WF ${s.toFixed(0)}</span>`;
+            }
+
+            return `<div class="config-card ${oosPass ? 'oos-pass' : 'oos-fail'}" onclick="showDetail(${c.id})">
+                <div class="cc-actions">
+                    <button class="btn-sm btn-outline" onclick="event.stopPropagation(); showDetail(${c.id})">View</button>
+                    <button class="btn-sm btn-red" onclick="event.stopPropagation(); deleteConfig(${c.id}, '${(c.instrument||'').replace(/'/g,'')}', '${(c.entry_type||'').replace(/'/g,'')}')" title="Supprimer cette config">&times;</button>
+                </div>
+                <div class="cc-header">
+                    <div>
+                        <span class="cc-instrument">${c.instrument||''}</span>
+                        <span class="cc-rank">#${c.rank||''}</span>
+                        <span class="cc-date">${date}</span>
+                    </div>
+                    <div style="text-align:right;">
+                        <span class="cc-score">${f(c.score,4)}</span>
+                        <span class="badge ${oosPass ? 'badge-pass' : 'badge-fail'}" style="margin-left:0.3rem;">${oosPass ? 'PASS' : 'FAIL'}</span>
+                    </div>
+                </div>
+                <div class="cc-tags">${tags}</div>
+                <div class="cc-perf">
+                    <div class="cc-perf-col">
+                        <div class="cc-section is-label">In-Sample</div>
+                        <div class="cc-metrics" style="grid-template-columns:repeat(2,1fr);">
+                            <div class="cc-metric"><div class="lbl">Calmar</div><div class="val ${metricClass(c.is_calmar,0.5)}">${f(c.is_calmar,3)}</div></div>
+                            <div class="cc-metric"><div class="lbl">MaxDD</div><div class="val ${(c.is_max_dd||0) >= -10 ? 'positive' : (c.is_max_dd||0) >= -20 ? 'neutral' : 'negative'}">${fPct(c.is_max_dd)}</div></div>
+                            <div class="cc-metric"><div class="lbl">PF</div><div class="val ${metricClass(c.is_profit_factor,1.3)}">${f(c.is_profit_factor,2)}</div></div>
+                            <div class="cc-metric"><div class="lbl">Trades</div><div class="val muted">${c.is_trades||0}</div></div>
+                        </div>
+                    </div>
+                    <div class="cc-perf-col">
+                        <div class="cc-section oos-label">Out-of-Sample</div>
+                        <div class="cc-metrics" style="grid-template-columns:repeat(2,1fr);">
+                            <div class="cc-metric"><div class="lbl">Calmar</div><div class="val ${metricClass(c.oos_calmar,0.25)}">${f(c.oos_calmar,3)}</div></div>
+                            <div class="cc-metric"><div class="lbl">MaxDD</div><div class="val ${(c.oos_max_dd||0) >= -10 ? 'positive' : (c.oos_max_dd||0) >= -20 ? 'neutral' : 'negative'}">${fPct(c.oos_max_dd)}</div></div>
+                            <div class="cc-metric"><div class="lbl">PF</div><div class="val ${metricClass(c.oos_profit_factor,1.2)}">${f(c.oos_profit_factor,2)}</div></div>
+                            <div class="cc-metric"><div class="lbl">Trades</div><div class="val muted">${c.oos_trades||0}</div></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="cc-robustness">
+                    <span style="font-size:0.65rem; color:var(--text-muted);">WFE: <strong style="color:var(--accent);">${wfe}</strong></span>
+                    ${pertBadge}
+                    ${wfBadge}
+                </div>
+            </div>`;
+        }).join('');
+    }
+
+    // ── Render TABLE view ──
+    function renderTable(sorted) {
+        const tbody = document.getElementById('db-tbody');
+
+        // Update sort indicators
+        document.querySelectorAll('#db-table th').forEach(th => {
+            th.classList.remove('sorted-asc', 'sorted-desc');
+            if (th.dataset.col === sortCol) th.classList.add(sortDir === 'asc' ? 'sorted-asc' : 'sorted-desc');
+        });
+
+        tbody.innerHTML = sorted.map(c => {
+            const date = c.run_date ? c.run_date.slice(0, 10) : '';
+            const pmax = `${c.pmax_ma_type||''}(${c.pmax_length||''})×${(c.pmax_multiplier||0).toFixed(1)}`;
+            const gate = c.oos_gate_pass ? '<span class="badge badge-pass">PASS</span>' : '<span class="badge badge-fail">FAIL</span>';
+            const wfe = c.wfe != null ? (c.wfe * 100).toFixed(0) + '%' : '';
+            const pert = c.perturbation_stable != null ? (c.perturbation_stable ? '<span class="badge badge-stable">S</span>' : '<span class="badge badge-fragile">F</span>') : '';
+            const wf = c.wf_stability != null ? `${c.wf_stability.toFixed(0)}` : '';
+
+            return `<tr onclick="showDetail(${c.id})">
+                <td><strong>${c.instrument||''}</strong></td>
+                <td>${c.rank||''}</td>
+                <td style="color:var(--accent);font-weight:600;">${f(c.score,4)}</td>
+                <td>${c.entry_type||''}</td>
+                <td style="font-size:0.7rem;">${pmax}</td>
+                <td>${f(c.is_calmar,3)}</td>
+                <td>${fPct(c.is_max_dd)}</td>
+                <td>${c.is_trades||0}</td>
+                <td>${f(c.is_profit_factor,2)}</td>
+                <td style="color:var(--green);">${f(c.oos_calmar,3)}</td>
+                <td>${fPct(c.oos_max_dd)}</td>
+                <td>${c.oos_trades||0}</td>
+                <td>${f(c.oos_profit_factor,2)}</td>
+                <td>${gate}</td>
+                <td>${wfe}</td>
+                <td>${pert}</td>
+                <td>${wf}</td>
+                <td style="font-size:0.68rem;color:var(--text-muted);">${date}</td>
+                <td><button class="btn-sm btn-red" onclick="event.stopPropagation(); deleteConfig(${c.id}, '${(c.instrument||'').replace(/'/g,'')}', '${(c.entry_type||'').replace(/'/g,'')}')" style="font-size:0.65rem; padding:0.15rem 0.4rem;" title="Supprimer">&times;</button></td>
+            </tr>`;
+        }).join('');
+    }
+
+    // ── Sort ──
+    function sortTable(col) {
+        if (sortCol === col) {
+            sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+        } else {
+            sortCol = col;
+            sortDir = 'desc';
+        }
+        renderAll();
+    }
+
+    // ── Detail modal ──
+    async function showDetail(configId) {
+        try {
+            const res = await fetch(`/api/db/config/${configId}`);
+            const c = await res.json();
+            if (c.error) { alert(c.error); return; }
+            window._currentDetail = c;
+            document.getElementById('modal-title').textContent =
+                `${c.instrument || ''} | Rank #${c.rank} | ${c.entry_type || ''} (${c.run_date ? c.run_date.slice(0,10) : ''})`;
+            document.getElementById('modal-tv-export').textContent = c.tv_export || 'No TV export available';
+            document.getElementById('copy-feedback').textContent = '';
+            document.getElementById('modal').classList.add('active');
+        } catch (e) { console.error('showDetail:', e); }
+    }
+
+    function copyModalText() {
+        const text = document.getElementById('modal-tv-export').textContent;
+        navigator.clipboard.writeText(text).then(() => {
+            document.getElementById('copy-feedback').textContent = 'TV config copied!';
+        });
+    }
+
+    function copyJsonConfig() {
+        const c = window._currentDetail;
+        if (!c || !c.config_json) return;
+        navigator.clipboard.writeText(c.config_json).then(() => {
+            document.getElementById('copy-feedback').textContent = 'JSON config copied!';
+        });
+    }
+
+    // ── CSV Export ──
+    function exportCsv() {
+        const inst = document.getElementById('filter-instrument').value;
+        const oos = document.getElementById('filter-oos').value;
+        let url = `/api/db/export_csv?oos_gate_only=${oos}`;
+        if (inst) url += `&instrument=${inst}`;
+        window.location.href = url;
+    }
+
+    // ── JSON Backup ──
+    function exportJsonBackup() {
+        document.getElementById('backup-status').textContent = 'Exporting...';
+        document.getElementById('backup-status').style.color = 'var(--accent)';
+        window.location.href = '/api/db/export_json';
+        setTimeout(() => {
+            document.getElementById('backup-status').textContent = 'Download started';
+            document.getElementById('backup-status').style.color = 'var(--green)';
+        }, 500);
+    }
+
+    async function importJsonBackup(input) {
+        const file = input.files[0];
+        if (!file) return;
+        const status = document.getElementById('backup-status');
+        status.textContent = `Importing ${file.name}...`;
+        status.style.color = 'var(--accent)';
+
+        const formData = new FormData();
+        formData.append('db_file', file);
+
+        try {
+            const res = await fetch('/api/db/import_json', { method: 'POST', body: formData });
+            const data = await res.json();
+            if (data.error) {
+                status.textContent = `Error: ${data.error}`;
+                status.style.color = 'var(--red)';
+            } else {
+                const parts = [];
+                if (data.imported_runs > 0) parts.push(`${data.imported_runs} runs`);
+                if (data.imported_configs > 0) parts.push(`${data.imported_configs} configs`);
+                if (data.skipped_runs > 0) parts.push(`${data.skipped_runs} skipped`);
+                if (data.errors && data.errors.length > 0) parts.push(`${data.errors.length} errors`);
+                status.textContent = parts.join(', ') || 'Nothing to import';
+                status.style.color = data.imported_runs > 0 ? 'var(--green)' : 'var(--orange)';
+                if (data.imported_runs > 0) {
+                    setTimeout(() => { location.reload(); }, 800);
+                }
+            }
+        } catch (e) {
+            status.textContent = `Error: ${e.message}`;
+            status.style.color = 'var(--red)';
+        }
+        input.value = '';
+    }
+
+    // ── Delete a single config ──
+    async function deleteConfig(configId, instrument, entryType) {
+        const msg = `Supprimer cette config ?\n\n${instrument} — ${entryType} (ID: ${configId})\n\nCette action est irreversible.`;
+        if (!confirm(msg)) return;
+        try {
+            const res = await fetch(`/api/db/delete_config/${configId}`, { method: 'DELETE' });
+            const data = await res.json();
+            if (data.ok) {
+                allConfigs = allConfigs.filter(c => c.id !== configId);
+                renderAll();
+            } else {
+                alert('Erreur: ' + (data.error || 'Suppression impossible'));
+            }
+        } catch (e) { alert('Erreur reseau: ' + e.message); }
+    }
+
+    // ── Delete an entire run ──
+    async function deleteSelectedRun() {
+        const runSel = document.getElementById('filter-run');
+        const runId = runSel.value;
+        if (!runId) { alert('Selectionnez un run dans le filtre.'); return; }
+        const runText = runSel.options[runSel.selectedIndex].textContent;
+        const msg = `Supprimer ce run et TOUTES ses configs ?\n\n${runText}\n\nCette action est irreversible.`;
+        if (!confirm(msg)) return;
+        try {
+            const res = await fetch(`/api/db/delete_run/${runId}`, { method: 'DELETE' });
+            const data = await res.json();
+            if (data.ok) {
+                runSel.value = '';
+                loadRuns();
+                loadConfigs();
+            } else {
+                alert('Erreur: ' + (data.error || 'Suppression impossible'));
+            }
+        } catch (e) { alert('Erreur reseau: ' + e.message); }
+    }
+
+    // ── Show/hide delete run button when a run is selected ──
+    document.getElementById('filter-run').addEventListener('change', function() {
+        document.getElementById('btn-delete-run').style.display = this.value ? 'inline-block' : 'none';
+    });
+
+    // ── Init ──
+    loadRuns();
+    loadConfigs();
+    </script>
+    <div style="position:fixed;bottom:6px;right:12px;font-size:0.65rem;color:#3a506b;letter-spacing:0.5px;pointer-events:none;z-index:9999;">{{ build_number }}</div>
+</body>
+</html>

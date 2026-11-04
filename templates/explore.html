@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PF AI Lab 6.0.3 - Explore</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+    <!-- Plotly not needed on explore page -->
+    <style>
+        :root { --bg-dark: #0a1628; --bg-card: #0f2035; --bg-input: #162a42; --border: #1e3a5f; --text: #e8edf4; --text-muted: #8ba3be; --accent: #00C8C8; --accent-hover: #00B4D8; --navy: #004C8C; --green: #00D084; --red: #f85149; --orange: #f0a030; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg-dark); color: var(--text); }
+        nav { background: var(--bg-card); border-bottom: 1px solid var(--border); padding: 0 2rem; display: flex; align-items: center; height: 60px; }
+        nav .logo { font-size: 1.3rem; font-weight: 700; color: #e8edf4; margin-right: 2rem; letter-spacing: 0.5px; }
+        nav .logo .brand { color: var(--accent); }
+        nav .logo span { color: var(--green); }
+        nav a { color: var(--text-muted); text-decoration: none; padding: 0.5rem 1rem; border-radius: 6px; margin: 0 0.2rem; font-size: 0.9rem; }
+        nav a:hover, nav a.active { color: var(--text); background: var(--bg-input); }
+        .container { max-width: 1400px; margin: 0 auto; padding: 2rem; }
+        h1 { font-size: 1.8rem; margin-bottom: 1.5rem; }
+        .card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; margin-bottom: 1.5rem; }
+        .error { background: rgba(248, 81, 73, 0.1); border: 1px solid var(--red); padding: 1rem; border-radius: 6px; margin: 1rem 0; }
+        input, select, button { background: var(--bg-input); border: 1px solid var(--border); color: var(--text); padding: 0.5rem 1rem; border-radius: 6px; font-size: 0.9rem; }
+        button { cursor: pointer; background: var(--accent); color: var(--bg-dark); font-weight: 600; border: none; padding: 0.7rem 1.5rem; transition: all 0.2s; }
+        button:hover { background: var(--accent-hover); box-shadow: 0 2px 12px rgba(0, 200, 200, 0.3); }
+        .progress-bar { width: 100%; height: 24px; background: var(--bg-input); border-radius: 12px; overflow: hidden; margin: 1rem 0; }
+        .progress-fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--green)); transition: width 0.5s; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; font-weight: 700; color: var(--bg-dark); }
+        table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+        th, td { padding: 0.6rem 0.8rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { color: var(--text-muted); font-weight: 600; position: sticky; top: 0; background: var(--bg-card); }
+        tr:hover { background: var(--bg-input); cursor: pointer; }
+        .badge { display: inline-block; padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.75rem; font-weight: 600; }
+        .badge-pass { background: rgba(0,208,132,0.15); color: var(--green); }
+        .badge-fail { background: rgba(248,81,73,0.15); color: var(--red); }
+        .badge-excellent { background: rgba(0,208,132,0.20); color: #00D084; }
+        .badge-verygood { background: rgba(0,200,200,0.15); color: #00C8C8; }
+        .badge-good { background: rgba(0,200,200,0.10); color: #5CCFCF; }
+        .badge-acceptable { background: rgba(240,160,48,0.15); color: var(--orange); }
+        .badge-weak { background: rgba(248,81,73,0.15); color: var(--red); }
+        .copy-btn { background: var(--bg-input); border: 1px solid var(--border); color: var(--accent); padding: 0.3rem 0.6rem; cursor: pointer; font-size: 0.75rem; border-radius: 4px; }
+        .copy-btn:hover { background: var(--accent); color: var(--bg-dark); }
+        pre.tv-export { background: var(--bg-input); padding: 1rem; border-radius: 6px; font-size: 0.8rem; overflow-x: auto; white-space: pre-wrap; max-height: 400px; overflow-y: auto; }
+        #modal { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); z-index: 1000; justify-content: center; align-items: center; }
+        #modal.active { display: flex; }
+        #modal-content { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 2rem; max-width: 800px; width: 90%; max-height: 80vh; overflow-y: auto; }
+        #modal-content h2 { margin-bottom: 1rem; }
+        #modal-close { position: absolute; top: 1rem; right: 1rem; background: none; border: none; color: var(--text-muted); font-size: 1.5rem; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <nav>
+        <div class="logo"><span class="brand">PF AI Lab</span> <span>{{ app_version }}</span></div>
+        <a href="/">Home</a>
+        <a href="/data">1. Data</a>
+        <a href="/explore" class="active">2. Explore</a>
+        <a href="/test">3. Test</a>
+        <a href="/validate">4. Validate</a>
+        <a href="/portfolio">5. Portfolio</a>
+        <a href="/best">Best Configs</a>
+        <a href="/audit">Audit</a>
+        <a href="/database">DB</a>
+    </nav>
+
+    <div class="container">
+        <h1>Step 2: Parameter Exploration</h1>
+
+        {% if error %}
+        <div class="error">{{ error }}</div>
+        {% endif %}
+
+        <div class="card" id="launch-form-card" {% if running %}style="display:none;"{% endif %}>
+            <h3 style="margin-bottom:1rem;">Launch Optimization</h3>
+            <form action="/explore" method="POST">
+                <input type="hidden" name="filepath" value="{{ filepath }}">
+                <!-- Instrument selector: pre-selected from session if available -->
+                <div style="display: flex; gap: 1rem; align-items: end; flex-wrap: wrap;">
+                    <div>
+                        <label style="display:block; color:var(--text-muted); font-size:0.85rem; margin-bottom:0.3rem;">Instrument</label>
+                        <select name="instrument" id="instrument-select" onchange="toggleCustomInstrumentExplore(this)">
+                            {% for group, insts in instrument_groups.items() %}
+                            <optgroup label="{{ group }}">
+                                {% for inst in insts %}
+                                <option value="{{ inst }}" {% if inst == smart_instrument %}selected{% endif %}>{{ inst }}</option>
+                                {% endfor %}
+                            </optgroup>
+                            {% endfor %}
+                            <optgroup label="── Autre ──">
+                                <option value="__custom__">Instrument custom...</option>
+                            </optgroup>
+                        </select>
+                    </div>
+                    <div id="custom-instrument-block-explore" style="display:none;">
+                        <label style="display:block; color:var(--orange); font-size:0.85rem; margin-bottom:0.3rem;">Nom instrument</label>
+                        <input type="text" name="custom_instrument_name" placeholder="ex. AAPL" style="width:120px;">
+                    </div>
+                    <div id="custom-cost-block-explore" style="display:none;">
+                        <label style="display:block; color:var(--orange); font-size:0.85rem; margin-bottom:0.3rem;">Cout (spread)</label>
+                        <input type="number" name="custom_transaction_cost" placeholder="ex. 0.5" step="0.001" min="0" style="width:90px;">
+                    </div>
+                    <div>
+                        <label style="display:block; color:var(--text-muted); font-size:0.85rem; margin-bottom:0.3rem;">Trials</label>
+                        <input type="number" name="n_trials" value="500" min="50" max="5000" style="width:100px;">
+                    </div>
+                    <div>
+                        <label style="display:block; color:var(--text-muted); font-size:0.85rem; margin-bottom:0.3rem;">Mode</label>
+                        <select name="mode" id="mode-select" onchange="toggleModeInfo()">
+                            <option value="focused">Focused (~12 params)</option>
+                            <option value="full">Full (~27 params)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label style="display:block; color:var(--text-muted); font-size:0.85rem; margin-bottom:0.3rem;">IS Ratio <span style="color:var(--accent); font-size:0.75rem;">(rec. 0.65-0.70)</span></label>
+                        <input type="number" name="is_ratio" value="0.70" min="0.50" max="0.90" step="0.05" style="width:80px;">
+                    </div>
+                    <button type="submit">Launch Exploration</button>
+                </div>
+                {% if not filepath %}
+                <p style="color:var(--orange); margin-top:0.5rem; font-size:0.85rem;">
+                    ⚠️ No data file loaded. <a href="/data" style="color:var(--accent);">Upload data on Step 1</a> first.
+                </p>
+                {% else %}
+                <p style="color:var(--green); margin-top:0.5rem; font-size:0.82rem; opacity:0.8;">
+                    ✓ Data file loaded: <code style="color:var(--accent);">{{ filepath.split('/')[-1] if filepath else '' }}</code>
+                </p>
+                {% endif %}
+                <!-- Entry signal selector -->
+                <div style="margin-top:1rem; padding:0.8rem; background:var(--bg-input); border-radius:6px; border-left:3px solid #6c5ce7; font-size:0.82rem;">
+                    <div style="display:flex; align-items:center; gap:1rem; flex-wrap:wrap;">
+                        <span style="color:#6c5ce7; font-weight:600;">Entry Signals</span>
+                        <label style="display:flex; align-items:center; gap:0.3rem; cursor:pointer; font-size:0.78rem; color:var(--text-muted);">
+                            <input type="checkbox" name="entry_Donc_Chikou" value="1" checked
+                                   style="width:15px; height:15px; accent-color:#6c5ce7; cursor:pointer;"
+                                   onchange="updateEntryCount()">
+                            Donc+Chikou
+                        </label>
+                        <label style="display:flex; align-items:center; gap:0.3rem; cursor:pointer; font-size:0.78rem; color:var(--text-muted);">
+                            <input type="checkbox" name="entry_RSI_Divergence" value="1" checked
+                                   style="width:15px; height:15px; accent-color:#6c5ce7; cursor:pointer;"
+                                   onchange="updateEntryCount()">
+                            RSI Divergence
+                        </label>
+                        <label style="display:flex; align-items:center; gap:0.3rem; cursor:pointer; font-size:0.78rem; color:var(--text-muted);">
+                            <input type="checkbox" name="entry_Fractal" value="1" checked
+                                   style="width:15px; height:15px; accent-color:#6c5ce7; cursor:pointer;"
+                                   onchange="updateEntryCount()">
+                            Fractal
+                        </label>
+                        <label style="display:flex; align-items:center; gap:0.3rem; cursor:pointer; font-size:0.78rem; color:var(--text-muted);">
+                            <input type="checkbox" name="entry_Boll_SMA" value="1" checked
+                                   style="width:15px; height:15px; accent-color:#6c5ce7; cursor:pointer;"
+                                   onchange="updateEntryCount()">
+                            Boll+SMA
+                        </label>
+                        <label style="display:flex; align-items:center; gap:0.3rem; cursor:pointer; font-size:0.78rem; color:var(--text-muted);">
+                            <input type="checkbox" name="entry_MM_Cross" value="1" checked
+                                   style="width:15px; height:15px; accent-color:#6c5ce7; cursor:pointer;"
+                                   onchange="updateEntryCount()">
+                            MM Cross
+                        </label>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:1rem; margin-top:0.5rem; flex-wrap:wrap;">
+                        <label style="display:flex; align-items:center; gap:0.4rem; cursor:pointer;">
+                            <input type="checkbox" name="entry_quota" value="1" id="entry-quota-check"
+                                   style="width:15px; height:15px; accent-color:var(--orange); cursor:pointer;"
+                                   onchange="updateEntryCount()">
+                            <span style="color:var(--orange); font-weight:600; font-size:0.78rem;">Quota Mode</span>
+                        </label>
+                        <span id="entry-quota-info" style="font-size:0.72rem; color:var(--text-muted);">
+                            <span id="entry-count-label">5 signals selected</span>
+                            <span id="entry-quota-detail" style="display:none;"> &mdash; trials split equally (~<span id="trials-per-signal">100</span>/signal)</span>
+                        </span>
+                    </div>
+                    <p style="color:var(--text-muted); font-size:0.7rem; margin-top:0.3rem; opacity:0.7;">
+                        Quota Mode = trials split equally across selected signals (prevents NSGA-II sampling bias).
+                        Without quota, Optuna may over-explore the best-performing signal.
+                    </p>
+                </div>
+
+                <!-- Mode info panel: shows fixed params for Focused, tunable ranges for Full -->
+                <div id="mode-info-focused" style="margin-top:1rem; padding:0.8rem; background:var(--bg-input); border-radius:6px; border-left:3px solid var(--accent); font-size:0.82rem;">
+                    <span style="color:var(--accent); font-weight:600;">Focused mode</span>
+                    <span style="color:var(--text-muted);"> &mdash; LT/MT filters locked to PineScript V69.1 defaults:</span>
+                    <div style="display:flex; gap:2rem; margin-top:0.4rem; flex-wrap:wrap;">
+                        <span style="color:var(--text-muted);">LT Trend: <strong style="color:var(--text);">EMA(20) Weekly</strong> &times; tunable</span>
+                        <span style="color:var(--text-muted);">MT Trend: <strong style="color:var(--text);">EMA(10) 4H</strong> &times; tunable</span>
+                        <span style="color:var(--text-muted);">ATR mult: <strong style="color:var(--green);">0.5 &ndash; 3.0</strong></span>
+                    </div>
+                </div>
+                <div id="mode-info-full" style="display:none; margin-top:1rem; padding:0.8rem; background:var(--bg-input); border-radius:6px; border-left:3px solid var(--orange); font-size:0.82rem;">
+                    <span style="color:var(--orange); font-weight:600;">Full mode</span>
+                    <span style="color:var(--text-muted);"> &mdash; LT/MT filters fully unlocked:</span>
+                    <div style="display:flex; gap:2rem; margin-top:0.4rem; flex-wrap:wrap;">
+                        <span style="color:var(--text-muted);">LT TF: <strong style="color:var(--green);">W, D</strong></span>
+                        <span style="color:var(--text-muted);">LT Length: <strong style="color:var(--green);">10&ndash;30</strong></span>
+                        <span style="color:var(--text-muted);">LT MA: <strong style="color:var(--green);">SMA, EMA</strong></span>
+                        <span style="color:var(--text-muted);">MT TF: <strong style="color:var(--green);">4H, 1H, D</strong></span>
+                        <span style="color:var(--text-muted);">MT Length: <strong style="color:var(--green);">5&ndash;20</strong></span>
+                        <span style="color:var(--text-muted);">MT MA: <strong style="color:var(--green);">SMA, EMA</strong></span>
+                    </div>
+                    <p style="color:var(--orange); margin-top:0.3rem; font-size:0.78rem;">&#9888; More free params = higher overfitting risk. Use when Focused fails OOS gates.</p>
+                </div>
+                <!-- DB Summary + Exclude DB configs option -->
+                <div id="exclude-db-panel" style="margin-top:1rem; padding:0.8rem; background:var(--bg-input); border-radius:6px; border-left:3px solid var(--green); font-size:0.82rem;">
+                    <!-- DB summary line -->
+                    <div id="db-summary-line" style="margin-bottom:0.6rem; padding-bottom:0.6rem; border-bottom:1px solid rgba(30,58,95,0.5); display:flex; gap:1.5rem; flex-wrap:wrap; align-items:center;">
+                        <span style="color:var(--text-muted); font-size:0.78rem;">
+                            <strong style="color:var(--accent);">DB</strong>:
+                            <span id="db-total-instruments" style="color:var(--green); font-weight:600;">{{ db_stats.instruments|length if db_stats else 0 }}</span> instruments,
+                            <span id="db-total-configs" style="color:var(--accent); font-weight:600;">{{ db_stats.total_configs if db_stats else 0 }}</span> configs,
+                            <span id="db-total-runs" style="font-weight:600;">{{ db_stats.total_runs if db_stats else 0 }}</span> runs
+                        </span>
+                        <a href="/database" style="color:var(--accent); font-size:0.75rem; text-decoration:none; opacity:0.7;">&rarr; View Database</a>
+                    </div>
+                    <label style="display:flex; align-items:center; gap:0.6rem; cursor:pointer;">
+                        <input type="checkbox" name="exclude_db" value="1" id="exclude-db-check"
+                               style="width:18px; height:18px; accent-color:var(--green); cursor:pointer;"
+                               onchange="updateExcludeInfo()"
+                               {% if smart_exclude_db %}checked{% endif %}>
+                        <span>
+                            <strong style="color:var(--green);">Exclude DB Configs</strong>
+                            <span style="color:var(--text-muted);"> &mdash; Force Optuna to explore new parameter regions by penalising combinations already in the database</span>
+                        </span>
+                    </label>
+                    <div id="exclude-db-info" style="margin-top:0.5rem; margin-left:2.2rem; display:{% if smart_exclude_db %}block{% else %}none{% endif %};">
+                        <div style="background:rgba(0,208,132,0.08); border:1px solid rgba(0,208,132,0.25); border-radius:6px; padding:0.5rem 0.8rem; display:inline-flex; align-items:center; gap:0.5rem;">
+                            <span style="font-size:1.3rem; color:var(--green); font-weight:700;" id="exclude-db-count">{{ smart_exclude_count|default(0) }}</span>
+                            <span style="color:var(--text-muted); font-size:0.78rem;">unique configs for <strong id="exclude-db-instrument" style="color:var(--text);">{{ smart_instrument|default('') }}</strong> (same data file) will be excluded<br><span style="font-size:0.72rem; opacity:0.7;">(exact match + &plusmn;1 PMax neighbourhood, scoped to instrument + timeframe)</span></span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Lock Parameters (optional) -->
+                <div style="margin-top:1rem; padding:0.8rem; background:var(--bg-input); border-radius:6px; border-left:3px solid var(--orange); font-size:0.82rem;">
+                    <div style="cursor:pointer; display:flex; align-items:center; justify-content:space-between;" onclick="toggleLockPanel()">
+                        <span>
+                            <span style="color:var(--orange); font-weight:600;">Verrouiller des Parametres</span>
+                            <span style="color:var(--text-muted);"> &mdash; Fixe des valeurs specifiques pendant qu'Optuna optimise le reste</span>
+                        </span>
+                        <span id="lock-toggle-icon" style="font-size:1.2rem; color:var(--text-muted);">+</span>
+                    </div>
+                    <div id="lock-params-body" style="display:none; margin-top:0.8rem;">
+                        <p style="color:var(--text-muted); font-size:0.72rem; margin-bottom:0.6rem; opacity:0.8;">
+                            Cochez un parametre et definissez sa valeur pour le verrouiller. Les parametres non coches restent libres pour l'optimisation Optuna.
+                        </p>
+                        <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(250px,1fr)); gap:0.5rem;">
+                            <!-- PMax Length -->
+                            <label style="display:flex; align-items:center; gap:0.4rem; font-size:0.78rem; color:var(--text-muted);">
+                                <input type="checkbox" name="lock_pmax_length" value="1" style="accent-color:var(--orange);" onchange="toggleLockInput(this,'lock_pmax_length_val')">
+                                PMax Length (nb periodes MA)
+                                <input type="number" name="lock_pmax_length_val" id="lock_pmax_length_val" value="10" min="5" max="30" style="width:55px; padding:0.2rem 0.4rem; font-size:0.78rem;" disabled>
+                            </label>
+                            <!-- PMax Multiplier -->
+                            <label style="display:flex; align-items:center; gap:0.4rem; font-size:0.78rem; color:var(--text-muted);">
+                                <input type="checkbox" name="lock_pmax_multiplier" value="1" style="accent-color:var(--orange);" onchange="toggleLockInput(this,'lock_pmax_multiplier_val')">
+                                PMax ATR Mult (largeur Red Line)
+                                <input type="number" name="lock_pmax_multiplier_val" id="lock_pmax_multiplier_val" value="3.0" min="1.5" max="5.0" step="0.1" style="width:60px; padding:0.2rem 0.4rem; font-size:0.78rem;" disabled>
+                            </label>
+
+                            <!-- Entry Type -->
+                            <label style="display:flex; align-items:center; gap:0.4rem; font-size:0.78rem; color:var(--text-muted);">
+                                <input type="checkbox" name="lock_entry_type" value="1" style="accent-color:var(--orange);" onchange="toggleLockInput(this,'lock_entry_type_val')">
+                                Signal d'Entree
+                                <select name="lock_entry_type_val" id="lock_entry_type_val" style="padding:0.2rem 0.3rem; font-size:0.78rem;" disabled>
+                                    <option value="Donc+Chikou">Donc+Chikou</option>
+                                    <option value="RSI Divergence">RSI Divergence</option>
+                                    <option value="Fractal">Fractal</option>
+                                    <option value="Boll+SMA">Boll+SMA</option>
+                                    <option value="MM Cross">MM Cross</option>
+                                </select>
+                            </label>
+                            <!-- LT Filter on/off -->
+                            <label style="display:flex; align-items:center; gap:0.4rem; font-size:0.78rem; color:var(--text-muted);" title="Filtre tendance Long Terme (PMax HTF)">
+                                <input type="checkbox" name="lock_use_lt_filter" value="1" style="accent-color:var(--orange);" onchange="toggleLockInput(this,'lock_use_lt_filter_val')">
+                                Filtre Tendance LT (HTF PMax)
+                                <select name="lock_use_lt_filter_val" id="lock_use_lt_filter_val" style="padding:0.2rem 0.3rem; font-size:0.78rem;" disabled>
+                                    <option value="true">ON</option>
+                                    <option value="false" selected>OFF</option>
+                                </select>
+                            </label>
+                            <!-- LT Multiplier -->
+                            <label style="display:flex; align-items:center; gap:0.4rem; font-size:0.78rem; color:var(--text-muted);" title="Multiplicateur ATR pour le PMax Long Terme">
+                                <input type="checkbox" name="lock_lt_multiplier" value="1" style="accent-color:var(--orange);" onchange="toggleLockInput(this,'lock_lt_multiplier_val')">
+                                LT ATR Mult (Red Line LT)
+                                <select name="lock_lt_multiplier_val" id="lock_lt_multiplier_val" style="padding:0.2rem 0.3rem; font-size:0.78rem;" disabled>
+                                    <option value="0.5">0.5</option><option value="1.0">1.0</option><option value="1.5" selected>1.5</option>
+                                    <option value="2.0">2.0</option><option value="2.5">2.5</option><option value="3.0">3.0</option>
+                                </select>
+                            </label>
+                            <!-- MT Filter on/off -->
+                            <label style="display:flex; align-items:center; gap:0.4rem; font-size:0.78rem; color:var(--text-muted);" title="Filtre tendance Moyen Terme (PMax TF intermediaire)">
+                                <input type="checkbox" name="lock_use_mt_filter" value="1" style="accent-color:var(--orange);" onchange="toggleLockInput(this,'lock_use_mt_filter_val')">
+                                Filtre Tendance MT
+                                <select name="lock_use_mt_filter_val" id="lock_use_mt_filter_val" style="padding:0.2rem 0.3rem; font-size:0.78rem;" disabled>
+                                    <option value="true">ON</option>
+                                    <option value="false" selected>OFF</option>
+                                </select>
+                            </label>
+                            <!-- RSI50 Filter -->
+                            <label style="display:flex; align-items:center; gap:0.4rem; font-size:0.78rem; color:var(--text-muted);" title="Long si RSI>50, Short si RSI<50">
+                                <input type="checkbox" name="lock_use_rsi50_filter" value="1" style="accent-color:var(--orange);" onchange="toggleLockInput(this,'lock_use_rsi50_filter_val')">
+                                RSI&gt;50 Filter
+                                <select name="lock_use_rsi50_filter_val" id="lock_use_rsi50_filter_val" style="padding:0.2rem 0.3rem; font-size:0.78rem;" disabled>
+                                    <option value="true">ON</option>
+                                    <option value="false" selected>OFF</option>
+                                </select>
+                            </label>
+                            <!-- Diff MA Red -->
+                            <label style="display:flex; align-items:center; gap:0.4rem; font-size:0.78rem; color:var(--text-muted);" title="Bloque si ecart MA/Red Line > X%">
+                                <input type="checkbox" name="lock_use_diff_ma_red" value="1" style="accent-color:var(--orange);" onchange="toggleLockInput(this,'lock_use_diff_ma_red_val')">
+                                Diff MA/Red (ecart max %)
+                                <select name="lock_use_diff_ma_red_val" id="lock_use_diff_ma_red_val" style="padding:0.2rem 0.3rem; font-size:0.78rem;" disabled>
+                                    <option value="true">ON</option>
+                                    <option value="false" selected>OFF</option>
+                                </select>
+                            </label>
+                            <!-- Donchian Length (Donc+Chikou) -->
+                            <label style="display:flex; align-items:center; gap:0.4rem; font-size:0.78rem; color:var(--text-muted);">
+                                <input type="checkbox" name="lock_don_length" value="1" style="accent-color:var(--orange);" onchange="toggleLockInput(this,'lock_don_length_val')">
+                                Donchian Length
+                                <input type="number" name="lock_don_length_val" id="lock_don_length_val" value="20" min="10" max="55" style="width:55px; padding:0.2rem 0.4rem; font-size:0.78rem;" disabled>
+                            </label>
+                            <!-- Order Pause -->
+                            <label style="display:flex; align-items:center; gap:0.4rem; font-size:0.78rem; color:var(--text-muted);">
+                                <input type="checkbox" name="lock_order_pause" value="1" style="accent-color:var(--orange);" onchange="toggleLockInput(this,'lock_order_pause_val')">
+                                Order Pause (barres entre trades)
+                                <input type="number" name="lock_order_pause_val" id="lock_order_pause_val" value="5" min="3" max="10" style="width:55px; padding:0.2rem 0.4rem; font-size:0.78rem;" disabled>
+                            </label>
+                        </div>
+                        <p id="lock-summary" style="color:var(--orange); font-size:0.72rem; margin-top:0.5rem; font-weight:600;"></p>
+                    </div>
+                </div>
+
+            </form>
+            <script>
+            function toggleCustomInstrumentExplore(sel) {
+                const isCustom = sel.value === '__custom__';
+                document.getElementById('custom-instrument-block-explore').style.display = isCustom ? '' : 'none';
+                document.getElementById('custom-cost-block-explore').style.display = isCustom ? '' : 'none';
+                // Re-trigger DB exclude count only for real instruments
+                if (!isCustom) { updateExcludeCount(); }
+            }
+            function toggleModeInfo() {
+                var mode = document.getElementById('mode-select').value;
+                document.getElementById('mode-info-focused').style.display = mode === 'focused' ? 'block' : 'none';
+                document.getElementById('mode-info-full').style.display = mode === 'full' ? 'block' : 'none';
+            }
+            // Lock parameters panel toggle & helpers
+            function toggleLockPanel() {
+                const body = document.getElementById('lock-params-body');
+                const icon = document.getElementById('lock-toggle-icon');
+                if (body.style.display === 'none') { body.style.display = 'block'; icon.textContent = '-'; }
+                else { body.style.display = 'none'; icon.textContent = '+'; }
+            }
+            function toggleLockInput(cb, inputId) {
+                const el = document.getElementById(inputId);
+                el.disabled = !cb.checked;
+                updateLockSummary();
+            }
+            function updateLockSummary() {
+                const lockCbs = document.querySelectorAll('input[name^="lock_"][type="checkbox"]');
+                let n = 0;
+                lockCbs.forEach(cb => { if (cb.checked) n++; });
+                const label = document.getElementById('lock-summary');
+                if (n > 0) label.textContent = n + ' parameter' + (n > 1 ? 's' : '') + ' locked';
+                else label.textContent = '';
+            }
+            // Entry signal count & quota mode
+            function updateEntryCount() {
+                const cbs = document.querySelectorAll('input[name^="entry_"][name!="entry_quota"]');
+                let n = 0;
+                cbs.forEach(cb => { if (cb.checked) n++; });
+                if (n === 0) { /* force at least one */
+                    event.target.checked = true; n = 1;
+                }
+                const quotaOn = document.getElementById('entry-quota-check').checked;
+                document.getElementById('entry-count-label').textContent = n + ' signal' + (n > 1 ? 's' : '') + ' selected';
+                document.getElementById('entry-quota-detail').style.display = quotaOn ? 'inline' : 'none';
+                const totalTrials = parseInt(document.querySelector('input[name="n_trials"]').value) || 500;
+                document.getElementById('trials-per-signal').textContent = Math.floor(totalTrials / n);
+            }
+            // Update quota info when trials change
+            document.querySelector('input[name="n_trials"]').addEventListener('input', updateEntryCount);
+            // Fetch and show DB config count when exclude checkbox is toggled
+            async function updateExcludeInfo() {
+                const checked = document.getElementById('exclude-db-check').checked;
+                const infoDiv = document.getElementById('exclude-db-info');
+                if (!checked) { infoDiv.style.display = 'none'; return; }
+                infoDiv.style.display = 'block';
+                const inst = document.getElementById('instrument-select').value;
+                try {
+                    const res = await fetch(`/api/db/instrument_config_count?instrument=${encodeURIComponent(inst)}`);
+                    const data = await res.json();
+                    document.getElementById('exclude-db-count').textContent = data.count || 0;
+                } catch (e) {
+                    document.getElementById('exclude-db-count').textContent = '?';
+                }
+            }
+            // Re-fetch count when instrument changes — and auto-toggle smart default
+            document.getElementById('instrument-select').addEventListener('change', async function() {
+                const inst = this.value;
+                try {
+                    const res = await fetch(`/api/db/instrument_config_count?instrument=${encodeURIComponent(inst)}`);
+                    const data = await res.json();
+                    const count = data.count || 0;
+                    const cb = document.getElementById('exclude-db-check');
+                    // Smart default: auto-check if DB has configs for this instrument
+                    cb.checked = count > 0;
+                    document.getElementById('exclude-db-count').textContent = count;
+                    document.getElementById('exclude-db-instrument').textContent = inst;
+                    document.getElementById('exclude-db-info').style.display = count > 0 ? 'block' : 'none';
+                } catch (e) {
+                    console.warn('config count fetch error:', e);
+                }
+            });
+            </script>
+        </div>
+
+        <div class="card" id="progress-card" style="display:none;">
+            <h3 id="progress-title">Optimization Running...</h3>
+            <p style="color:var(--text-muted); margin: 0.5rem 0;" id="progress-info">
+                {% if running %}{{ instrument }} | {{ mode }} mode | {{ n_trials }} trials{% endif %}
+            </p>
+            <div class="progress-bar">
+                <div class="progress-fill" id="progress-fill" style="width:0%;">0%</div>
+            </div>
+            <p id="progress-text" style="color:var(--text-muted); font-size:0.85rem;">Starting...</p>
+        </div>
+
+        <div id="results-container" style="display:none;">
+            <div class="card" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem;">
+                <div>
+                    <h3>Optimization Complete</h3>
+                    <p id="results-summary" style="color:var(--text-muted);"></p>
+                </div>
+                <div style="display:flex; gap:0.6rem; align-items:center;">
+                    <span id="db-save-status" style="font-size:0.82rem; color:var(--green);"></span>
+                    <a href="/database" style="color:var(--accent); font-size:0.85rem; text-decoration:none;">View DB &rarr;</a>
+                    <button onclick="resetAndNewRun()" style="background:var(--orange); font-size:0.82rem; padding:0.5rem 1rem;">
+                        New Run
+                    </button>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3>Top 20 Configurations</h3>
+                <p style="color:var(--text-muted); font-size:0.85rem; margin-bottom:1rem;">
+                    Click any row to see the full TradingView config (copy-paste ready).
+                </p>
+                <div style="overflow-x:auto;">
+                    <table id="results-table">
+                        <thead>
+                            <tr>
+                                <th>#</th><th>Score</th><th>Entry</th><th>Direction</th><th>PMax</th>
+                                <th>IS Calmar</th><th>IS MaxDD</th><th>IS Trades</th><th>IS WR</th><th>IS PF</th>
+                                <th>OOS Calmar</th><th>OOS Trades</th><th>OOS PF</th><th>OOS Gate</th><th>WFE</th>
+                                <th>&plusmn;10%</th>
+                                <th>WF Score</th>
+                                <th>TV Config</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for TV config -->
+    <div id="modal" onclick="if(event.target===this)this.classList.remove('active')">
+        <div id="modal-content" style="position:relative;">
+            <button id="modal-close" onclick="document.getElementById('modal').classList.remove('active')">&times;</button>
+            <h2 id="modal-title">TradingView Configuration</h2>
+            <pre class="tv-export" id="modal-tv-export"></pre>
+            <div style="display:flex; gap:0.8rem; margin-top:1rem; flex-wrap:wrap;">
+                <button onclick="copyTvText()" style="background:var(--accent);">Copy TV Text</button>
+                <button onclick="copyJsonConfig()" style="background:var(--green);">Copy JSON Config (for Validate)</button>
+            </div>
+            <p id="copy-feedback" style="color:var(--green); font-size:0.85rem; margin-top:0.5rem; min-height:1.2em;"></p>
+        </div>
+    </div>
+
+    <script>
+    // ===================================================================
+    // Results display logic
+    // ===================================================================
+    async function loadResults() {
+        try {
+            const res = await fetch('/api/optimization_result');
+            const data = await res.json();
+
+            if (data.error) {
+                console.warn('No results:', data.error);
+                return;
+            }
+
+            document.getElementById('progress-card').style.display = 'none';
+            document.getElementById('launch-form-card').style.display = 'none';
+            document.getElementById('results-container').style.display = 'block';
+            const exclInfo = data.n_excluded_trials > 0
+                ? ` | ${data.n_excluded_trials} DB-duplicate trials excluded`
+                : '';
+            document.getElementById('results-summary').textContent =
+                `${data.instrument} | IS: ${data.is_range?.[0]} to ${data.is_range?.[1]} | ` +
+                `OOS: ${data.oos_range?.[0]} to ${data.oos_range?.[1]} | ` +
+                `Duration: ${data.duration_sec?.toFixed(1)}s` + exclInfo;
+
+            const tbody = document.querySelector('#results-table tbody');
+            tbody.innerHTML = '';
+
+            (data.configs || []).forEach(cfg => {
+                const mis = cfg.metrics_is || {};
+                const moos = cfg.metrics_oos || {};
+                const c = cfg.config || {};
+
+                // OOS Gate: adaptive DD threshold per instrument asset class
+                // (matching server-side logic from config.py OOS_DD_LIMITS)
+                const DD_LIMITS = {
+                    'US30': -15, 'US100': -15, 'US500': -15, 'UK100': -15, 'DEU40': -15, 'GER40': -15,
+                    'FRA40': -15, 'ESP35': -15, 'JPN225': -15, 'AUS200': -15, 'EUSTX50': -15, 'HK50': -15, 'CHINA50': -15,
+                    'BTCUSD': -18, 'ETHUSD': -18, 'SOLUSD': -18, 'BNBUSD': -18, 'XRPUSD': -18, 'ADAUSD': -18,
+                    'LTCUSD': -20, 'DOTUSD': -20, 'DOGEUSD': -20, 'AVAXUSD': -20, 'LINKUSD': -20, 'XLMUSD': -20,
+                    'AAVEUSD': -20, 'XMRUSD': -20, 'NEOUSD': -20, 'DASHUSD': -20, 'MATICUSD': -20, 'ATOMUSD': -20,
+                    'ALGOUSD': -20, 'ICPUSD': -20, 'FILUSD': -20, 'APTUSD': -20, 'ARBUSD': -20, 'OPUSD': -20,
+                    'NEARUSD': -20, 'FTMUSD': -20, 'TRXUSD': -20, 'UNIUSD': -20, 'TONUSD': -20, 'PEPEUSD': -20,
+                    'SUIUSD': -20, 'SHIBAUSD': -20,
+                    'XAUUSD': -12, 'XAGUSD': -12, 'XPTUSD': -12, 'XPDUSD': -12,
+                    'USOIL': -12, 'UKOIL': -12, 'NATGAS': -12,
+                    'EURUSD': -8, 'GBPUSD': -8, 'USDJPY': -8, 'USDCHF': -8, 'USDCAD': -8, 'AUDUSD': -8, 'NZDUSD': -8,
+                    'EURGBP': -10, 'EURJPY': -10, 'EURCHF': -10, 'EURAUD': -10, 'EURCAD': -10, 'EURNZD': -10,
+                    'GBPJPY': -10, 'GBPCHF': -10, 'GBPAUD': -10, 'GBPNZD': -10, 'GBPCAD': -10,
+                    'AUDJPY': -10, 'AUDNZD': -10, 'AUDCAD': -10, 'AUDCHF': -10,
+                    'NZDJPY': -10, 'NZDCAD': -10, 'NZDCHF': -10, 'CADJPY': -10, 'CADCHF': -10, 'CHFJPY': -10,
+                    'EURTRY': -15, 'USDTRY': -15, 'EURPLN': -15, 'USDPLN': -15, 'EURNOK': -15, 'USDNOK': -15,
+                    'EURSEK': -15, 'USDSEK': -15, 'USDMXN': -15, 'USDZAR': -15, 'EURCZK': -15, 'EURHUF': -15,
+                    'USDSGD': -15, 'GBPSGD': -15, 'USDHKD': -15, 'USDCNH': -15,
+                };
+                const instName = data.instrument || '';
+                const ddLimit = DD_LIMITS[instName] || -8;
+                const passOOS = (moos.calmar || 0) >= 0.25 && (moos.profit_factor || 0) >= 1.2 &&
+                               (moos.max_dd || 0) >= ddLimit && (moos.n_trades || 0) >= 15;
+
+                // WFE (Walk-Forward Efficiency) = OOS Calmar / IS Calmar
+                const isCalmar = mis.calmar || 0;
+                const oosCalmar = moos.calmar || 0;
+                const wfe = isCalmar > 0 ? oosCalmar / isCalmar : 0;
+                const wfePct = (wfe * 100).toFixed(0);
+                let wfeBadge, wfeLabel;
+                if (wfe >= 0.85) { wfeBadge = 'badge-excellent'; wfeLabel = 'EXCELLENT'; }
+                else if (wfe >= 0.70) { wfeBadge = 'badge-verygood'; wfeLabel = 'VERY GOOD'; }
+                else if (wfe >= 0.50) { wfeBadge = 'badge-good'; wfeLabel = 'GOOD'; }
+                else if (wfe >= 0.40) { wfeBadge = 'badge-acceptable'; wfeLabel = 'ACCEPTABLE'; }
+                else { wfeBadge = 'badge-weak'; wfeLabel = 'WEAK'; }
+
+                const row = document.createElement('tr');
+                row.onclick = () => showConfig(cfg.rank - 1);
+                // Direction label
+                const longOn = c.long_side !== false;
+                const shortOn = c.short_side !== false;
+                let dirLabel, dirClass;
+                if (longOn && shortOn) { dirLabel = 'L+S'; dirClass = ''; }
+                else if (longOn && !shortOn) { dirLabel = 'LONG'; dirClass = 'color:var(--green);font-weight:700;'; }
+                else if (!longOn && shortOn) { dirLabel = 'SHORT'; dirClass = 'color:var(--red);font-weight:700;'; }
+                else { dirLabel = '\u2014'; dirClass = 'color:var(--red);'; }
+
+                row.innerHTML = `
+                    <td><strong>${cfg.rank}</strong></td>
+                    <td>${cfg.score?.toFixed(4)}</td>
+                    <td>${c.entry_type || '\u2014'}</td>
+                    <td style="${dirClass}">${dirLabel}</td>
+                    <td>${c.pmax_ma_type || 'EMA'}(${c.pmax_length || '\u2014'})x${(c.pmax_multiplier || 0).toFixed(1)}</td>
+                    <td>${(mis.calmar || 0).toFixed(3)}</td>
+                    <td>${(mis.max_dd || 0).toFixed(2)}%</td>
+                    <td>${mis.n_trades || 0}</td>
+                    <td>${(mis.win_rate || 0).toFixed(1)}%</td>
+                    <td>${(mis.profit_factor || 0).toFixed(3)}</td>
+                    <td>${(moos.calmar || 0).toFixed(3)}</td>
+                    <td>${moos.n_trades || 0}</td>
+                    <td>${(moos.profit_factor || 0).toFixed(3)}</td>
+                    <td><span class="badge ${passOOS ? 'badge-pass' : 'badge-fail'}">${passOOS ? 'PASS' : 'FAIL'}</span></td>
+                    <td><span class="badge ${wfeBadge}" title="WFE: OOS/IS Calmar = ${wfePct}%">${wfeLabel} ${wfePct}%</span></td>
+                    <td><span class="badge ${cfg.perturbation_pass?.stable ? 'badge-pass' : 'badge-fail'}">${cfg.perturbation_pass?.stable ? 'STABLE' : cfg.perturbation_pass ? 'FRAGILE' : '\u2014'}</span></td>
+                    <td>${cfg.walk_forward ? (() => {
+                        const s = cfg.walk_forward.stability_score || 0;
+                        const cls = s >= 70 ? 'badge-pass' : 'badge-fail';
+                        const lbl = s >= 70 ? 'STABLE' : s >= 40 ? 'MODERATE' : s > 0 ? 'UNSTABLE' : '\u2014';
+                        return '<span class="badge ' + cls + '">' + lbl + ' ' + s.toFixed(0) + '</span>';
+                    })() : '\u2014'}</td>
+                    <td><button class="copy-btn" onclick="showConfig(${cfg.rank - 1})">View</button></td>
+                `;
+                tbody.appendChild(row);
+            });
+
+            window._configs = data.configs;
+        } catch (e) { console.error('loadResults error:', e); }
+    }
+
+    function showConfig(idx) {
+        const cfg = window._configs[idx];
+        if (!cfg) return;
+        window._currentConfigIdx = idx;
+        document.getElementById('modal-title').textContent = `Rank #${cfg.rank} \u2014 TradingView Config`;
+        document.getElementById('modal-tv-export').textContent = cfg.tv_export || 'N/A';
+        document.getElementById('copy-feedback').textContent = '';
+        document.getElementById('modal').classList.add('active');
+    }
+
+    function copyTvText() {
+        const text = document.getElementById('modal-tv-export').textContent;
+        navigator.clipboard.writeText(text).then(() => {
+            document.getElementById('copy-feedback').textContent = 'TV text copied!';
+        });
+    }
+
+    function copyJsonConfig() {
+        const cfg = window._configs[window._currentConfigIdx];
+        if (!cfg || !cfg.config) return;
+        const json = JSON.stringify(cfg.config);
+        navigator.clipboard.writeText(json).then(() => {
+            document.getElementById('copy-feedback').textContent =
+                'JSON config copied! Paste it in Validate > Strategy Config field.';
+        });
+    }
+
+    // ===================================================================
+    // Polling for optimization progress
+    // ===================================================================
+    function startPolling() {
+        const trialsTotal = {{ n_trials|default(500) }};
+        document.getElementById('progress-card').style.display = 'block';
+        document.getElementById('launch-form-card').style.display = 'none';
+
+        const pollInterval = setInterval(async () => {
+            try {
+                const res = await fetch('/api/optimization_status');
+                const data = await res.json();
+
+                const pct = data.total > 0 ? Math.min(100, Math.round(data.progress / data.total * 100)) : 0;
+                document.getElementById('progress-fill').style.width = pct + '%';
+                document.getElementById('progress-fill').textContent = pct + '%';
+
+                if (data.progress <= trialsTotal) {
+                    document.getElementById('progress-text').textContent =
+                        `Trial ${data.progress}/${trialsTotal} | Best Score: ${data.best_score?.toFixed(4) || '\u2014'}`;
+                } else {
+                    const postStep = data.progress - trialsTotal;
+                    let phase = 'OOS validation';
+                    if (postStep > 20) phase = 'Perturbation check';
+                    if (postStep > 30) phase = 'Walk-Forward analysis';
+                    document.getElementById('progress-text').textContent =
+                        `Post-processing: ${phase} (${postStep}/35) | Best Score: ${data.best_score?.toFixed(4) || '\u2014'}`;
+                }
+
+                if (!data.running) {
+                    clearInterval(pollInterval);
+                    if (data.has_result) {
+                        loadResults();
+                    } else if (data.error) {
+                        document.getElementById('progress-card').innerHTML =
+                            `<div class="error"><strong>Error:</strong><pre>${data.error}</pre></div>`;
+                    }
+                }
+            } catch (e) { console.error('poll error:', e); }
+        }, 2000);
+    }
+
+    // ===================================================================
+    // Reset state and show the launch form again
+    // ===================================================================
+    async function resetAndNewRun() {
+        try {
+            await fetch('/api/optimization_reset', { method: 'POST' });
+        } catch (e) { console.warn('reset error:', e); }
+        // Hide results, show form
+        document.getElementById('results-container').style.display = 'none';
+        document.getElementById('progress-card').style.display = 'none';
+        document.getElementById('launch-form-card').style.display = 'block';
+        // Re-trigger the DB exclude count for current instrument
+        const inst = document.getElementById('instrument-select');
+        if (inst) inst.dispatchEvent(new Event('change'));
+    }
+
+    // ===================================================================
+    // On page load: detect current state and act accordingly
+    // Handles: running optimization, completed results, errors, or idle
+    // ===================================================================
+    (async function init() {
+        try {
+            const res = await fetch('/api/optimization_status');
+            const data = await res.json();
+
+            if (data.running) {
+                // Optimization is in progress - show progress and start polling
+                startPolling();
+            } else if (data.has_result) {
+                // Optimization finished - show results immediately (BUG-011 fix)
+                loadResults();
+            } else if (data.error) {
+                // Optimization errored - show error with a reset button
+                document.getElementById('progress-card').style.display = 'block';
+                document.getElementById('progress-card').innerHTML =
+                    `<div class="error"><strong>Optimization Error:</strong><pre>${data.error}</pre></div>` +
+                    `<button onclick="resetAndNewRun()" style="margin-top:1rem; background:var(--orange);">Back to Form</button>`;
+            }
+            // else: no optimization yet - form is shown by default
+        } catch (e) { console.error('init check error:', e); }
+    })();
+    </script>
+    <div style="position:fixed;bottom:6px;right:12px;font-size:0.65rem;color:#3a506b;letter-spacing:0.5px;pointer-events:none;z-index:9999;">{{ build_number }}</div>
+</body>
+</html>
